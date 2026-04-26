@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 const NAV_ITEMS = [
   { id: 'tasks', label: 'Tasks', href: '/tasks' },
   { id: 'leaderboard', label: 'Leaderboard', href: '#', soon: true },
-  { id: 'me', label: 'My Dojo', href: '/my-dojo' },
+  { id: 'me', label: 'My Dojo', href: '/me' },
 ];
 
 export default function NavBar({
