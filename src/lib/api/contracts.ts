@@ -39,6 +39,12 @@ export interface TaskListItem {
   category_slug: string;
   difficulty: Difficulty;
   estimated_minutes: number;
+  progress?: {
+    attempt_count: number;
+    completed_count: number;
+    best_score: number | null;
+    last_status: SessionStatus | null;
+  };
 }
 
 export interface ListTasksResponse {
