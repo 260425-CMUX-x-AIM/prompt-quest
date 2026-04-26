@@ -1,27 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NavBar from '@/components/NavBar';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import ProgressBar from '@/components/ProgressBar';
-import { ALL_TASKS, CATEGORIES, type Task } from '@/lib/data';
+import { getErrorMessage } from '@/lib/api/errors';
+import type { TaskListItem, ListTasksResponse, ApiError } from '@/lib/api/contracts';
 
-function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
-  const isDone = !!task.completed;
+const CATEGORIES = [
+  'regex',
+  'debug',
+  'review',
+  'component',
+  'algo',
+  'api_design',
+  'test',
+  'arch',
+  'refactor',
+  'security',
+  'perf',
+] as const;
+
+function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
-      className="grid items-center border-b border-line transition-colors duration-75"
+      className="grid items-center border-b border-line transition-colors duration-75 cursor-pointer"
       style={{
         gridTemplateColumns: '24px 1fr 110px 90px 100px 80px 100px',
         gap: 16,
         padding: '14px 18px',
-        cursor: task.locked ? 'not-allowed' : 'pointer',
-        opacity: task.locked ? 0.45 : 1,
       }}
       onMouseEnter={(e) => {
-        if (!task.locked) e.currentTarget.style.background = 'var(--color-bg-1)';
+        e.currentTarget.style.background = 'var(--color-bg-1)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent';
@@ -32,51 +44,35 @@ function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
         style={{
           width: 16,
           height: 16,
-          border: `1px solid ${isDone ? 'var(--color-acc)' : 'var(--color-line-2)'}`,
-          background: isDone ? 'var(--color-acc)' : 'transparent',
-          color: 'var(--color-acc-ink)',
+          border: '1px solid var(--color-line-2)',
+          background: 'transparent',
           fontSize: 10,
           fontWeight: 700,
         }}
-      >
-        {isDone && '✓'}
-      </div>
+      />
 
       <div>
-        <div style={{ fontSize: 13.5, marginBottom: 3, fontWeight: 450 }}>
-          {task.locked && (
-            <span className="text-text-4 mr-1.5" style={{ fontSize: 12 }}>
-              🔒
-            </span>
-          )}
-          {task.title}
-        </div>
+        <div style={{ fontSize: 13.5, marginBottom: 3, fontWeight: 450 }}>{task.title}</div>
         <div className="font-mono text-text-3" style={{ fontSize: 10.5 }}>
           {task.slug}
         </div>
       </div>
 
-      <CategoryTag cat={task.cat} />
-      <DiffTag level={task.diff} />
+      <CategoryTag cat={task.category_slug} />
+      <DiffTag level={task.difficulty} />
 
       <div className="font-mono text-text-3" style={{ fontSize: 11.5 }}>
-        ~{task.mins}분
+        ~{task.estimated_minutes}분
       </div>
 
       <div className="font-mono text-text-3" style={{ fontSize: 11 }}>
-        {task.attempts}회
+        —
       </div>
 
       <div className="flex items-center gap-2 justify-end">
-        {isDone ? (
-          <div className="font-mono text-acc" style={{ fontSize: 11 }}>
-            {task.completed}
-          </div>
-        ) : (
-          <div style={{ width: 60 }}>
-            <ProgressBar value={task.completion * 100} color="var(--color-text-4)" height={3} />
-          </div>
-        )}
+        <div style={{ width: 60 }}>
+          <ProgressBar value={0} color="var(--color-text-4)" height={3} />
+        </div>
       </div>
     </div>
   );
@@ -87,10 +83,37 @@ export default function TasksPage() {
   const [diff, setDiff] = useState('all');
   const [cat, setCat] = useState('all');
   const [q, setQ] = useState('');
+  const [tasks, setTasks] = useState<TaskListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = ALL_TASKS.filter((t) => {
-    if (diff !== 'all' && t.diff !== diff) return false;
-    if (cat !== 'all' && t.cat !== cat) return false;
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/tasks')
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as ApiError | null;
+          setError(getErrorMessage(data?.error?.code));
+          return;
+        }
+        const data = (await res.json()) as ListTasksResponse;
+        setTasks(data.tasks);
+      })
+      .catch(() => {
+        if (!cancelled) setError('태스크 목록을 불러올 수 없습니다.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = tasks.filter((t) => {
+    if (diff !== 'all' && t.difficulty !== diff) return false;
+    if (cat !== 'all' && t.category_slug !== cat) return false;
     if (q && !t.title.toLowerCase().includes(q.toLowerCase()) && !t.slug.includes(q)) return false;
     return true;
   });
@@ -113,12 +136,12 @@ export default function TasksPage() {
           <div className="flex flex-col gap-1 mb-6">
             {(
               [
-                ['all', 'All', 11],
-                ['easy', 'Easy', 3],
-                ['medium', 'Medium', 4],
-                ['hard', 'Hard', 4],
+                ['all', 'All'],
+                ['easy', 'Easy'],
+                ['medium', 'Medium'],
+                ['hard', 'Hard'],
               ] as const
-            ).map(([k, l, c]) => (
+            ).map(([k, l]) => (
               <div
                 key={k}
                 onClick={() => setDiff(k)}
@@ -131,9 +154,6 @@ export default function TasksPage() {
                 }}
               >
                 <span>{l}</span>
-                <span className="font-mono text-text-4" style={{ fontSize: 10 }}>
-                  {c}
-                </span>
               </div>
             ))}
           </div>
@@ -184,7 +204,9 @@ export default function TasksPage() {
                   Tasks
                 </h1>
                 <div className="text-text-3 mt-1" style={{ fontSize: 12 }}>
-                  {filtered.length} of {ALL_TASKS.length} tasks · 2 completed
+                  {loading
+                    ? '불러오는 중…'
+                    : `${filtered.length} of ${tasks.length} tasks`}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -202,18 +224,6 @@ export default function TasksPage() {
                     className="font-mono bg-transparent border-none outline-none text-text-1 flex-1"
                     style={{ fontSize: 12 }}
                   />
-                  <span
-                    className="font-mono text-text-2 rounded"
-                    style={{
-                      fontSize: 10.5,
-                      padding: '1px 5px',
-                      background: 'var(--color-bg-2)',
-                      border: '1px solid var(--color-line-2)',
-                      borderBottomWidth: 2,
-                    }}
-                  >
-                    /
-                  </span>
                 </div>
               </div>
             </div>
@@ -243,13 +253,22 @@ export default function TasksPage() {
             ))}
           </div>
 
+          {error && (
+            <div className="text-err font-mono p-5" style={{ fontSize: 12 }}>
+              {error}
+            </div>
+          )}
+          {!loading && !error && filtered.length === 0 && (
+            <div className="text-text-3 p-5" style={{ fontSize: 12 }}>
+              표시할 태스크가 없습니다.
+            </div>
+          )}
+
           {filtered.map((t) => (
             <TaskRow
               key={t.slug}
               task={t}
-              onClick={() => {
-                if (!t.locked) router.push(`/tasks/${t.slug}`);
-              }}
+              onClick={() => router.push(`/tasks/${t.slug}`)}
             />
           ))}
         </div>

@@ -1,52 +1,108 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import NavBar from '@/components/NavBar';
 import { CategoryTag, DiffTag } from '@/components/Tags';
-import ProgressBar from '@/components/ProgressBar';
-import Sparkline from '@/components/Sparkline';
-import { HISTORY } from '@/lib/data';
+import { getErrorMessage } from '@/lib/api/errors';
+import type { MeSessionsResponse, MeSessionsItem, ApiError } from '@/lib/api/contracts';
+import type { SessionStatus } from '@/lib/types/session';
 
-// 정적 데모용 활동 데이터 — 결정적 시드로 생성해 React Compiler의 render 순수성 규칙 만족.
-// (Day 8에서 /me 페이지로 재작성되며 실 데이터로 교체됨)
-const activityData = Array.from({ length: 84 }).map((_, i) => {
-  const v = ((i * 9301 + 49297) % 233280) / 233280;
-  return v < 0.4 ? 0 : v < 0.6 ? 1 : v < 0.85 ? 2 : 3;
-});
+const STATUS_LABELS: Record<SessionStatus, string> = {
+  in_progress: '진행 중',
+  submitted: '제출됨',
+  evaluating: '채점 중',
+  evaluated: '완료',
+  failed: '실패',
+  abandoned: '포기',
+};
 
-export default function MyDojoPage() {
-  const intensityColors = [
-    'var(--color-bg-3)',
-    'oklch(0.86 0.20 130 / 0.3)',
-    'oklch(0.86 0.20 130 / 0.55)',
-    'var(--color-acc)',
-  ];
+const STATUS_FILTERS: Array<{ value: 'all' | SessionStatus; label: string }> = [
+  { value: 'all', label: '전체' },
+  { value: 'in_progress', label: '진행 중' },
+  { value: 'evaluated', label: '완료' },
+  { value: 'failed', label: '실패' },
+  { value: 'abandoned', label: '포기' },
+];
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${m}/${day}`;
+}
+
+function scoreColor(score: number | null) {
+  if (score == null) return 'var(--color-text-4)';
+  if (score >= 80) return 'var(--color-acc)';
+  if (score >= 60) return 'var(--color-warn)';
+  return 'var(--color-err)';
+}
+
+export default function MyPage() {
+  const [filter, setFilter] = useState<'all' | SessionStatus>('all');
+  const [sessions, setSessions] = useState<MeSessionsItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams({ limit: '50' });
+    if (filter !== 'all') params.set('status', filter);
+    fetch(`/api/me/sessions?${params}`)
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as ApiError | null;
+          setError(getErrorMessage(data?.error?.code));
+          return;
+        }
+        const data = (await res.json()) as MeSessionsResponse;
+        setSessions(data.sessions);
+        setTotal(data.total);
+      })
+      .catch(() => {
+        if (!cancelled) setError('세션 목록을 불러올 수 없습니다.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filter]);
+
+  const evaluatedCount = sessions.filter((s) => s.status === 'evaluated').length;
+  const totalTokens = sessions.reduce(
+    (sum, s) => sum + s.total_input_tokens + s.total_output_tokens,
+    0,
+  );
+  const avgScore = (() => {
+    const scored = sessions.filter((s) => s.total_score != null);
+    if (scored.length === 0) return null;
+    const sum = scored.reduce((a, s) => a + (s.total_score ?? 0), 0);
+    return (sum / scored.length).toFixed(1);
+  })();
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg-0 text-text-1">
       <NavBar />
       <div className="flex-1 overflow-y-auto custom-scroll">
         <div className="max-w-[1100px] mx-auto" style={{ padding: '32px 36px' }}>
-          <div
-            className="font-mono text-text-3 mb-1"
-            style={{ fontSize: 11, letterSpacing: '0.08em' }}
-          >
-            kim.dev · joined 2026-03
-          </div>
           <h1 className="font-medium mb-7" style={{ fontSize: 26 }}>
-            My Dojo
+            My
           </h1>
 
           {/* Stats */}
-          <div className="grid grid-cols-5 gap-2.5 mb-7">
+          <div className="grid grid-cols-3 gap-2.5 mb-7">
             {(
               [
-                ['avg score', '79.0', 'var(--color-acc)', [70, 65, 72, 78, 81, 79, 87]],
-                ['solved', '14', null, [1, 1, 2, 2, 3, 3, 4]],
-                ['streak', '4 days', null, null],
-                ['total tokens', '38.2k', null, null],
-                ['rank', 'Brown · 312', null, null],
-              ] as [string, string, string | null, number[] | null][]
-            ).map(([l, v, c, spark]) => (
+                ['avg score', avgScore ?? '—', 'var(--color-acc)'],
+                ['solved', String(evaluatedCount), null],
+                ['total tokens', totalTokens.toLocaleString(), null],
+              ] as [string, string, string | null][]
+            ).map(([l, v, c]) => (
               <div key={l} className="bg-bg-1 border border-line rounded-[10px] p-4">
                 <div
                   className="font-mono text-text-3 uppercase mb-1.5"
@@ -60,205 +116,114 @@ export default function MyDojoPage() {
                 >
                   {v}
                 </div>
-                {spark && (
-                  <div className="mt-2">
-                    <Sparkline data={spark} color={c || 'var(--color-text-3)'} w={100} />
-                  </div>
-                )}
               </div>
             ))}
           </div>
 
-          <div className="grid gap-7" style={{ gridTemplateColumns: '1fr 280px' }}>
-            {/* History */}
-            <div>
-              <div className="flex justify-between items-baseline mb-3.5">
+          {/* Filter */}
+          <div className="flex gap-2 mb-3.5">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setFilter(f.value)}
+                className="rounded font-mono"
+                style={{
+                  padding: '5px 10px',
+                  fontSize: 11.5,
+                  letterSpacing: '0.04em',
+                  color: filter === f.value ? 'var(--color-text-1)' : 'var(--color-text-3)',
+                  background: filter === f.value ? 'var(--color-bg-2)' : 'transparent',
+                  border: '1px solid var(--color-line)',
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div
+            className="font-mono text-text-3 mb-3"
+            style={{ fontSize: 11, letterSpacing: '0.08em' }}
+          >
+            ─── HISTORY · {total} SESSIONS
+          </div>
+
+          {error && (
+            <div className="text-err font-mono mb-3" style={{ fontSize: 12 }}>
+              {error}
+            </div>
+          )}
+
+          <div className="bg-bg-1 border border-line rounded-[10px] overflow-hidden">
+            <div
+              className="grid gap-3 border-b border-line bg-bg-1"
+              style={{
+                gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
+                padding: '8px 16px',
+              }}
+            >
+              {['DATE', 'TASK', 'CATEGORY', 'DIFF', 'SCORE', 'STATUS'].map((h) => (
                 <div
+                  key={h}
                   className="font-mono text-text-3"
-                  style={{ fontSize: 11, letterSpacing: '0.08em' }}
+                  style={{ fontSize: 9.5, letterSpacing: '0.06em' }}
                 >
-                  ─── HISTORY · LAST 7 SESSIONS
+                  {h}
                 </div>
-                <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                  view all →
-                </span>
+              ))}
+            </div>
+
+            {loading && (
+              <div className="text-text-3 p-5" style={{ fontSize: 12 }}>
+                불러오는 중…
               </div>
-              <div className="bg-bg-1 border border-line rounded-[10px] overflow-hidden">
-                <div
-                  className="grid gap-3 border-b border-line bg-bg-1"
+            )}
+            {!loading && sessions.length === 0 && (
+              <div className="text-text-3 p-5" style={{ fontSize: 12 }}>
+                아직 도전한 태스크가 없습니다.{' '}
+                <Link href="/tasks" className="underline">
+                  태스크 목록 →
+                </Link>
+              </div>
+            )}
+
+            {sessions.map((s, i) => {
+              const isInProgress = s.status === 'in_progress';
+              const target = isInProgress
+                ? `/challenge/${s.id}`
+                : `/results/${s.id}`;
+              return (
+                <Link
+                  key={s.id}
+                  href={target}
+                  className="grid gap-3 items-center border-b border-line hover:bg-bg-2"
                   style={{
-                    gridTemplateColumns: '60px 1fr 100px 80px 60px 60px 60px',
-                    padding: '8px 16px',
+                    gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
+                    padding: '12px 16px',
+                    borderBottom:
+                      i < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
+                    opacity: s.status === 'abandoned' ? 0.45 : 1,
                   }}
                 >
-                  {['DATE', 'TASK', 'CATEGORY', 'DIFF', 'SCORE', 'TRIES', 'TIME'].map((h) => (
-                    <div
-                      key={h}
-                      className="font-mono text-text-3"
-                      style={{ fontSize: 9.5, letterSpacing: '0.06em' }}
-                    >
-                      {h}
-                    </div>
-                  ))}
-                </div>
-                {HISTORY.map((h, i) => (
-                  <div
-                    key={i}
-                    className="grid gap-3 items-center"
-                    style={{
-                      gridTemplateColumns: '60px 1fr 100px 80px 60px 60px 60px',
-                      padding: '12px 16px',
-                      borderBottom: i < HISTORY.length - 1 ? '1px solid var(--color-line)' : 'none',
-                      opacity: 'abandoned' in h && h.abandoned ? 0.45 : 1,
-                    }}
-                  >
-                    <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                      {h.date}
-                    </span>
-                    <span style={{ fontSize: 13 }}>
-                      {'abandoned' in h && h.abandoned && (
-                        <span className="font-mono text-err mr-1.5" style={{ fontSize: 10 }}>
-                          abandoned
-                        </span>
-                      )}
-                      {h.task}
-                    </span>
-                    <CategoryTag cat={h.cat} />
-                    <DiffTag level={h.diff} />
-                    <span
-                      className="font-mono font-medium"
-                      style={{
-                        fontSize: 13,
-                        color:
-                          h.score == null
-                            ? 'var(--color-text-4)'
-                            : h.score >= 80
-                              ? 'var(--color-acc)'
-                              : h.score >= 60
-                                ? 'var(--color-warn)'
-                                : 'var(--color-err)',
-                      }}
-                    >
-                      {h.score ?? '—'}
-                    </span>
-                    <span className="font-mono text-text-3" style={{ fontSize: 11.5 }}>
-                      {h.attempts}
-                    </span>
-                    <span className="font-mono text-text-3" style={{ fontSize: 11.5 }}>
-                      {h.time}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Skill breakdown */}
-              <div
-                className="font-mono text-text-3 mt-7 mb-3.5"
-                style={{ fontSize: 11, letterSpacing: '0.08em' }}
-              >
-                ─── SKILL BREAKDOWN
-              </div>
-              <div className="bg-bg-1 border border-line rounded-[10px] p-4.5">
-                <div className="flex flex-col gap-2.5">
-                  {[
-                    ['프롬프트 명확성', 8.6],
-                    ['컨텍스트 활용', 7.9],
-                    ['에러 복구', 8.2],
-                    ['토큰 효율', 6.4],
-                    ['시도 효율', 7.8],
-                  ].map(([l, v]) => (
-                    <div
-                      key={l as string}
-                      className="grid gap-3.5 items-center"
-                      style={{ gridTemplateColumns: '160px 1fr 50px' }}
-                    >
-                      <span className="text-text-2" style={{ fontSize: 12.5 }}>
-                        {l as string}
-                      </span>
-                      <ProgressBar
-                        value={(v as number) * 10}
-                        color={(v as number) >= 8 ? 'var(--color-acc)' : 'var(--color-warn)'}
-                        height={5}
-                      />
-                      <span className="font-mono text-right" style={{ fontSize: 12 }}>
-                        {(v as number).toFixed(1)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Aside */}
-            <div>
-              <div
-                className="font-mono text-text-3 mb-3.5"
-                style={{ fontSize: 11, letterSpacing: '0.08em' }}
-              >
-                ─── ACTIVITY · 12 WEEKS
-              </div>
-              <div className="bg-bg-1 border border-line rounded-[10px] p-3.5 mb-5">
-                <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
-                  {activityData.map((intensity, i) => (
-                    <div
-                      key={i}
-                      className="rounded-[2px]"
-                      style={{ aspectRatio: '1', background: intensityColors[intensity] }}
-                    />
-                  ))}
-                </div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                    less
+                  <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+                    {formatDate(s.started_at)}
                   </span>
-                  <div className="flex gap-0.5">
-                    {intensityColors.map((c, i) => (
-                      <div
-                        key={i}
-                        className="rounded-[2px]"
-                        style={{ width: 9, height: 9, background: c }}
-                      />
-                    ))}
-                  </div>
-                  <span className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                    more
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="font-mono text-text-3 mb-3.5"
-                style={{ fontSize: 11, letterSpacing: '0.08em' }}
-              >
-                ─── BADGES
-              </div>
-              <div className="bg-bg-1 border border-line rounded-[10px] p-3.5">
-                {[
-                  ['🥋', 'First Submission', '04-23'],
-                  ['⚡', 'Sub-5min Solver', '04-23'],
-                  ['🎯', 'No Retry Hero', '04-25'],
-                  ['🔒', 'Streak 7d', 'locked'],
-                ].map(([ic, name, date], i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3"
-                    style={{
-                      padding: '8px 0',
-                      borderBottom: i < 3 ? '1px solid var(--color-line)' : 'none',
-                      opacity: date === 'locked' ? 0.4 : 1,
-                    }}
+                  <span style={{ fontSize: 13 }}>{s.task.title}</span>
+                  <CategoryTag cat={s.task.category} />
+                  <DiffTag level={s.task.difficulty} />
+                  <span
+                    className="font-mono font-medium"
+                    style={{ fontSize: 13, color: scoreColor(s.total_score) }}
                   >
-                    <span style={{ fontSize: 18 }}>{ic}</span>
-                    <div className="flex-1">
-                      <div style={{ fontSize: 12.5 }}>{name}</div>
-                      <div className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                        {date}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                    {s.total_score ?? '—'}
+                  </span>
+                  <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+                    {STATUS_LABELS[s.status]}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
