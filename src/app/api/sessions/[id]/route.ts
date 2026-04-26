@@ -99,6 +99,7 @@ export async function GET(
       context: taskDef.context,
       requirements: taskDef.requirements,
       artifact_format: taskDef.artifact_format,
+      test_cases: taskDef.test_cases,
       constraints: taskDef.constraints,
     },
   });

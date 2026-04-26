@@ -212,14 +212,39 @@ async function validateArtifact(
     passed_requirements?: string[];
     failed_requirements?: Array<{ id?: string; reason?: string }>;
     overall_reason?: string;
+    test_results?: Array<{
+      id?: string;
+      type?: string;
+      passed?: boolean;
+      input?: unknown;
+      expected?: unknown;
+      actual?: unknown;
+      reason?: string;
+    }>;
   }>(config, {
     system:
-      '당신은 결과물의 요구사항 충족 여부를 판정하는 검증관입니다. 반드시 JSON으로만 답하세요.',
+      '당신은 결과물의 요구사항 충족 여부를 판정하는 검증관입니다. 테스트케이스별 통과 여부를 포함해 반드시 JSON으로만 답하세요.',
     prompt: JSON.stringify({
       task: taskDefinition.metadata.title,
       requirements: taskDefinition.requirements,
       test_cases: taskDefinition.test_cases,
       artifact,
+      output_schema: {
+        passed_requirements: ['req-1'],
+        failed_requirements: [{ id: 'req-2', reason: '실패 이유' }],
+        overall_reason: '전체 판정 요약',
+        test_results: [
+          {
+            id: 'tc-1',
+            type: 'positive',
+            passed: true,
+            input: '테스트 입력',
+            expected: '기대 결과',
+            actual: '제출 결과가 테스트를 어떻게 만족/불만족했는지',
+            reason: '실패 시 이유',
+          },
+        ],
+      },
     }),
     model: config.validatorModel,
     temperature: 0,
@@ -237,8 +262,44 @@ async function validateArtifact(
     passed: failedRequirements.length === 0,
     passed_requirements: (response.passed_requirements ?? []).filter(Boolean),
     failed_requirements: failedRequirements,
+    test_results: normalizeLlmTestResults(taskDefinition, response.test_results),
     overall_reason: response.overall_reason?.trim() || '검증 결과 요약이 없습니다.',
   };
+}
+
+function normalizeLlmTestResults(
+  taskDefinition: TaskDefinition,
+  testResults:
+    | Array<{
+        id?: string;
+        type?: string;
+        passed?: boolean;
+        input?: unknown;
+        expected?: unknown;
+        actual?: unknown;
+        reason?: string;
+      }>
+    | undefined,
+): ValidatorResult['test_results'] {
+  if (!Array.isArray(testResults) || testResults.length === 0) return undefined;
+
+  const testCaseById = new Map(
+    taskDefinition.test_cases.map((testCase) => [testCase.id, testCase]),
+  );
+  return testResults.flatMap((result) => {
+    const testCase = result.id ? testCaseById.get(result.id) : undefined;
+    if (!testCase) return [];
+
+    return {
+      id: testCase.id,
+      type: testCase.type,
+      passed: Boolean(result.passed),
+      input: result.input ?? testCase.input,
+      expected: result.expected ?? testCase.expected_matches ?? testCase.expected_output ?? null,
+      actual: result.actual ?? null,
+      reason: result.reason,
+    };
+  });
 }
 
 function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string): ValidatorResult {
@@ -249,6 +310,7 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
 
   const { pattern, flags } = regexParts;
   const failedRequirements: ValidatorResult['failed_requirements'] = [];
+  const testResults: NonNullable<ValidatorResult['test_results']> = [];
   try {
     const regex = new RegExp(pattern, flags);
     for (const testCase of taskDefinition.test_cases) {
@@ -263,26 +325,40 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
         : Array.isArray(testCase.expected_output)
           ? testCase.expected_output.filter((value): value is string => typeof value === 'string')
           : [];
-      if (JSON.stringify(matches) !== JSON.stringify(expected)) {
+      const passed = JSON.stringify(matches) === JSON.stringify(expected);
+      testResults.push({
+        id: testCase.id,
+        type: testCase.type,
+        passed,
+        input: testCase.input,
+        expected,
+        actual: matches,
+        reason: passed ? undefined : '기대 매칭과 실제 매칭이 다릅니다.',
+      });
+      if (!passed) {
         failedRequirements.push({
           id: 'req-1',
           reason: `${testCase.id}에서 기대 매칭과 실제 매칭이 다릅니다. expected=${JSON.stringify(expected)}, actual=${JSON.stringify(matches)}`,
         });
-        break;
       }
     }
   } catch (error) {
+    const reason = error instanceof Error ? error.message : '정규식을 해석하지 못했습니다.';
     failedRequirements.push({
       id: 'req-1',
-      reason: error instanceof Error ? error.message : '정규식을 해석하지 못했습니다.',
+      reason,
     });
-  }
-
-  if (!/\\\./.test(pattern) && !/\./.test(pattern)) {
-    failedRequirements.push({
-      id: 'req-2',
-      reason: '도메인 구분 점(.) 제약을 찾지 못했습니다.',
-    });
+    for (const testCase of taskDefinition.test_cases) {
+      testResults.push({
+        id: testCase.id,
+        type: testCase.type,
+        passed: false,
+        input: testCase.input,
+        expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+        actual: null,
+        reason,
+      });
+    }
   }
 
   for (const forbiddenPattern of taskDefinition.constraints.forbidden_patterns ?? []) {
@@ -301,6 +377,7 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
       .map((item) => item.id)
       .filter((id) => !failedIds.has(id)),
     failed_requirements: failedRequirements,
+    test_results: testResults,
     overall_reason:
       failedRequirements.length === 0
         ? '정적 regex 테스트를 통과했습니다.'
@@ -342,6 +419,15 @@ function failAllRequirements(taskDefinition: TaskDefinition, reason: string): Va
     passed_requirements: [],
     failed_requirements: taskDefinition.requirements.map((requirement) => ({
       id: requirement.id,
+      reason,
+    })),
+    test_results: taskDefinition.test_cases.map((testCase) => ({
+      id: testCase.id,
+      type: testCase.type,
+      passed: false,
+      input: testCase.input,
+      expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+      actual: null,
       reason,
     })),
     overall_reason: reason,
@@ -501,6 +587,7 @@ function aggregate({
         judge.successful_runs < 2 ||
         judgeMaxStddev > 2 ||
         quantitative.efficiency.baseline_source === 'default',
+      test_results: validator.test_results,
     },
   };
 }

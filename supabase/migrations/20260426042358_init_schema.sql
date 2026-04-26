@@ -68,7 +68,8 @@ values
   ('arch', '아키텍처 설계', 'Architecture', 20),
   ('refactor', '리팩토링', 'Refactoring', 21),
   ('security', '보안 취약점', 'Security', 22),
-  ('perf', '성능 분석', 'Performance', 23)
+  ('perf', '성능 분석', 'Performance', 23),
+  ('sql', 'SQL', 'SQL', 24)
 on conflict (slug) do nothing;
 
 alter table task_categories enable row level security;

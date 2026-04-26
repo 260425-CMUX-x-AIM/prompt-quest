@@ -6,6 +6,17 @@ export interface ValidatorResult {
   passed_requirements: string[];
   failed_requirements: { id: string; reason: string }[];
   overall_reason: string;
+  test_results?: TestCaseResult[];
+}
+
+export interface TestCaseResult {
+  id: string;
+  type: string;
+  passed: boolean;
+  input: unknown;
+  expected: unknown;
+  actual: unknown;
+  reason?: string;
 }
 
 export interface QuantitativeResult {
@@ -55,6 +66,7 @@ export interface AggregatedResult {
     judge_runs_succeeded: number;
     judge_max_stddev: number;
     is_low_confidence: boolean;
+    test_results?: TestCaseResult[];
   };
 }
 

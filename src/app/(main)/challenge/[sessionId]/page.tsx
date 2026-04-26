@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { DiffTag } from '@/components/Tags';
+import TaskReferenceMaterial from '@/components/TaskReferenceMaterial';
 import { getClientAiConfig } from '@/lib/ai-provider.client';
 import { extractCodeBlocks } from '@/lib/challenge';
 import { getErrorMessage } from '@/lib/api/errors';
@@ -39,7 +40,7 @@ function MessageBubble({
   onAddToArtifact: (block: CodeBlock) => void;
 }) {
   const isUser = msg.role === 'user';
-  const blocks = msg.extracted_code_blocks?.blocks ?? [];
+  const blocks = (msg.extracted_code_blocks?.blocks ?? []).slice(-1);
   return (
     <div
       className="flex gap-3 border-b border-line"
@@ -434,7 +435,7 @@ export default function ChallengePage({ params }: { params: Promise<{ sessionId:
         {/* 좌: 태스크 정보 */}
         <div
           className="shrink-0 border-r border-line overflow-y-auto custom-scroll"
-          style={{ width: 260, padding: '16px 18px' }}
+          style={{ width: 320, padding: '16px 18px' }}
         >
           <div
             className="font-mono text-text-3 mb-2"
@@ -448,6 +449,9 @@ export default function ChallengePage({ params }: { params: Promise<{ sessionId:
           <p className="text-text-2 mb-5" style={{ fontSize: 12, lineHeight: 1.55 }}>
             {task.context.scenario || task.context.background}
           </p>
+
+          <TaskReferenceMaterial context={task.context} />
+
           <div
             className="font-mono text-text-3 mb-2"
             style={{ fontSize: 10, letterSpacing: '0.08em' }}

@@ -6,6 +6,15 @@ interface ValidatorResponse {
   passed_requirements?: string[];
   failed_requirements?: Array<{ id?: string; reason?: string }>;
   overall_reason?: string;
+  test_results?: Array<{
+    id?: string;
+    type?: string;
+    passed?: boolean;
+    input?: unknown;
+    expected?: unknown;
+    actual?: unknown;
+    reason?: string;
+  }>;
 }
 
 const VALIDATOR_SYSTEM = `
@@ -23,7 +32,18 @@ const VALIDATOR_SYSTEM = `
 {
   "passed_requirements": ["req-1"],
   "failed_requirements": [{ "id": "req-2", "reason": "실패 이유" }],
-  "overall_reason": "전체 판정 요약"
+  "overall_reason": "전체 판정 요약",
+  "test_results": [
+    {
+      "id": "tc-1",
+      "type": "positive",
+      "passed": true,
+      "input": "테스트 입력",
+      "expected": "기대 결과",
+      "actual": "제출 결과가 테스트를 어떻게 만족/불만족했는지",
+      "reason": "실패 시 이유"
+    }
+  ]
 }
 `;
 
@@ -89,6 +109,30 @@ ${artifact}
     passed: failedRequirements.length === 0,
     passed_requirements: (response.passed_requirements ?? []).filter(Boolean),
     failed_requirements: failedRequirements,
+    test_results: normalizeLlmTestResults(challenge, response.test_results),
     overall_reason: response.overall_reason?.trim() || '검증 결과 요약이 없습니다.',
   };
+}
+
+function normalizeLlmTestResults(
+  challenge: ChallengeDefinition,
+  testResults: ValidatorResponse['test_results'],
+): ValidatorResult['test_results'] {
+  if (!Array.isArray(testResults) || testResults.length === 0) return undefined;
+
+  const testCaseById = new Map(challenge.testCases.map((testCase) => [testCase.id, testCase]));
+  return testResults.flatMap((result) => {
+    const testCase = result.id ? testCaseById.get(result.id) : undefined;
+    if (!testCase) return [];
+
+    return {
+      id: testCase.id,
+      type: testCase.type,
+      passed: Boolean(result.passed),
+      input: result.input ?? testCase.input ?? testCase.scenario ?? '',
+      expected: result.expected ?? testCase.expected,
+      actual: result.actual ?? null,
+      reason: result.reason,
+    };
+  });
 }

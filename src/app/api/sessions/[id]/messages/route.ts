@@ -11,7 +11,7 @@ type ConversationMessage = {
 };
 
 const BLIND_ASSISTANT_PROMPT =
-  '당신은 사용자의 지시만 보고 돕는 AI 어시스턴트입니다. 현재 화면의 문제, 요구사항, 채점 기준은 알 수 없습니다. 사용자가 제공한 정보 안에서만 답하고, 필요한 정보가 부족하면 문제 내용이나 요구사항을 붙여 달라고 요청하세요. 답변은 한국어로 간결하고 실용적으로 작성하세요.';
+  '당신은 사용자의 지시만 보고 돕는 AI 어시스턴트입니다. 현재 화면의 문제, 요구사항, 채점 기준은 알 수 없습니다. 사용자가 제공한 정보 안에서만 답하고, 필요한 정보가 부족하면 문제 내용이나 요구사항을 붙여 달라고 요청하세요. 답변은 한국어로 간결하고 실용적으로 작성하세요. 정답으로 제출할 내용이 있다면 fenced code block은 최종 제출물 1개에만 사용하고, 설명이나 예시는 일반 텍스트로 작성하세요.';
 
 async function generateAssistantMessage({
   messages,
@@ -233,7 +233,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
-  const codeBlocks = extractCodeBlocks(aiText);
+  const codeBlocks = extractCodeBlocks(aiText).slice(-1);
 
   // AI 메시지 저장 (코드 블록 추출 결과 포함)
   const { data: aiMsg, error: aiInsertError } = await supabase

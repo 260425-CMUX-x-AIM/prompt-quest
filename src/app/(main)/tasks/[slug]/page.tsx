@@ -5,20 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NavBar from '@/components/NavBar';
 import { CategoryTag, DiffTag } from '@/components/Tags';
+import TaskReferenceMaterial from '@/components/TaskReferenceMaterial';
 import { getErrorMessage } from '@/lib/api/errors';
-import type {
-  GetTaskResponse,
-  CreateSessionResponse,
-  ApiError,
-} from '@/lib/api/contracts';
+import type { GetTaskResponse, CreateSessionResponse, ApiError } from '@/lib/api/contracts';
 
 type TaskDetail = GetTaskResponse['task'];
 
-export default function TaskDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default function TaskDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
   const [task, setTask] = useState<TaskDetail | null>(null);
@@ -144,6 +137,8 @@ export default function TaskDetailPage({
                 {task.context.scenario || task.context.background}
               </p>
 
+              <TaskReferenceMaterial context={task.context} />
+
               <div
                 className="font-mono text-text-3 mb-2.5"
                 style={{ fontSize: 10, letterSpacing: '0.08em' }}
@@ -203,19 +198,13 @@ export default function TaskDetailPage({
                     {startError}
                   </div>
                 )}
-                <div
-                  className="font-mono text-text-3 text-center mt-2.5"
-                  style={{ fontSize: 10 }}
-                >
+                <div className="font-mono text-text-3 text-center mt-2.5" style={{ fontSize: 10 }}>
                   세션은 자동 저장됩니다
                 </div>
               </div>
 
               <div className="bg-bg-1 border border-line rounded-[10px] p-4">
-                <div
-                  className="font-mono text-text-3 mb-2"
-                  style={{ fontSize: 10 }}
-                >
+                <div className="font-mono text-text-3 mb-2" style={{ fontSize: 10 }}>
                   CONSTRAINTS
                 </div>
                 <div className="flex flex-col gap-1">

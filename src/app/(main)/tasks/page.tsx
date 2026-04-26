@@ -11,22 +11,27 @@ import type { TaskListItem, ListTasksResponse, ApiError } from '@/lib/api/contra
 
 const PAGE_SIZE = 12;
 
-const CATEGORIES = [
-  'implementation',
-  'diagnosis',
-  'review',
-  'component',
-  'architecture',
-  'test',
-  'security',
-  'communication',
-  'creative',
-  'analysis',
-  'workflow',
-  'strategy',
-] as const;
+function scoreColor(score: number | null) {
+  if (score == null) return 'var(--color-text-4)';
+  if (score >= 80) return 'var(--color-acc)';
+  if (score >= 60) return 'var(--color-warn)';
+  return 'var(--color-err)';
+}
+
+function statusLabel(status: NonNullable<TaskListItem['progress']>['last_status']) {
+  if (status === 'in_progress') return 'RUN';
+  if (status === 'evaluating' || status === 'submitted') return 'WAIT';
+  if (status === 'failed') return 'FAIL';
+  if (status === 'abandoned') return 'DROP';
+  return '—';
+}
 
 function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
+  const progress = task.progress;
+  const attempted = (progress?.attempt_count ?? 0) > 0;
+  const solved = (progress?.completed_count ?? 0) > 0;
+  const bestScore = progress?.best_score ?? null;
+
   return (
     <div
       onClick={onClick}
@@ -44,16 +49,19 @@ function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void })
       }}
     >
       <div
-        className="grid place-items-center rounded"
+        className="grid place-items-center rounded font-mono"
         style={{
           width: 16,
           height: 16,
-          border: '1px solid var(--color-line-2)',
-          background: 'transparent',
+          border: `1px solid ${solved ? 'var(--color-acc)' : 'var(--color-line-2)'}`,
+          background: solved ? 'var(--color-acc-dim)' : 'transparent',
+          color: solved ? 'var(--color-acc)' : 'var(--color-text-4)',
           fontSize: 10,
           fontWeight: 700,
         }}
-      />
+      >
+        {solved ? '✓' : attempted ? '•' : ''}
+      </div>
 
       <div>
         <div style={{ fontSize: 13.5, marginBottom: 3, fontWeight: 450 }}>{task.title}</div>
@@ -70,12 +78,18 @@ function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void })
       </div>
 
       <div className="font-mono text-text-3" style={{ fontSize: 11 }}>
-        —
+        {attempted ? progress?.attempt_count : '—'}
       </div>
 
       <div className="flex items-center gap-2 justify-end">
+        <div
+          className="font-mono"
+          style={{ fontSize: 11, minWidth: 28, textAlign: 'right', color: scoreColor(bestScore) }}
+        >
+          {bestScore ?? (attempted ? statusLabel(progress?.last_status ?? null) : '—')}
+        </div>
         <div style={{ width: 60 }}>
-          <ProgressBar value={0} color="var(--color-text-4)" height={3} />
+          <ProgressBar value={bestScore ?? 0} color={scoreColor(bestScore)} height={3} />
         </div>
       </div>
     </div>
@@ -131,6 +145,7 @@ export default function TasksPage() {
     medium: tasks.filter((task) => task.difficulty === 'medium').length,
     hard: tasks.filter((task) => task.difficulty === 'hard').length,
   };
+  const categories = Array.from(new Set(tasks.map((task) => task.category_slug))).sort();
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg-0 text-text-1">
@@ -198,7 +213,7 @@ export default function TasksPage() {
             >
               All
             </div>
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <div
                 key={c}
                 onClick={() => {
@@ -213,7 +228,7 @@ export default function TasksPage() {
                   background: cat === c ? 'var(--color-acc-dim)' : 'transparent',
                 }}
               >
-                {c}
+                {c.toUpperCase()}
               </div>
             ))}
           </div>

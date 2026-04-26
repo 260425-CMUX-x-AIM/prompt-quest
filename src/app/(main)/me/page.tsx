@@ -56,6 +56,18 @@ function scoreColor(score: number | null) {
   return 'var(--color-err)';
 }
 
+function historyTarget(session: MeSessionsItem) {
+  if (session.status === 'in_progress') return `/challenge/${session.id}`;
+  if (session.status === 'evaluated') return `/results/${session.id}`;
+  return null;
+}
+
+function historyStatusLabel(session: MeSessionsItem) {
+  if (session.status === 'evaluated') return '결과 보기 →';
+  if (session.status === 'in_progress') return '이어하기 →';
+  return STATUS_LABELS[session.status];
+}
+
 function dateKeyFromDate(date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -404,24 +416,16 @@ export default function MyPage() {
                 )}
 
                 {sessions.map((session, index) => {
-                  const target =
-                    session.status === 'in_progress'
-                      ? `/challenge/${session.id}`
-                      : `/results/${session.id}`;
-
-                  return (
-                    <Link
-                      key={session.id}
-                      href={target}
-                      className="grid items-center gap-3 border-b border-line hover:bg-bg-2"
-                      style={{
-                        gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
-                        padding: '12px 16px',
-                        borderBottom:
-                          index < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
-                        opacity: session.status === 'abandoned' ? 0.45 : 1,
-                      }}
-                    >
+                  const target = historyTarget(session);
+                  const rowStyle = {
+                    gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
+                    padding: '12px 16px',
+                    borderBottom:
+                      index < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
+                    opacity: session.status === 'abandoned' ? 0.45 : 1,
+                  };
+                  const rowContent = (
+                    <>
                       <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
                         {formatDate(session.started_at)}
                       </span>
@@ -434,10 +438,35 @@ export default function MyPage() {
                       >
                         {session.total_score ?? '—'}
                       </span>
-                      <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                        {STATUS_LABELS[session.status]}
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: 11,
+                          color: target ? 'var(--color-acc)' : 'var(--color-text-3)',
+                        }}
+                      >
+                        {historyStatusLabel(session)}
                       </span>
+                    </>
+                  );
+
+                  return target ? (
+                    <Link
+                      key={session.id}
+                      href={target}
+                      className="grid items-center gap-3 border-b border-line hover:bg-bg-2"
+                      style={rowStyle}
+                    >
+                      {rowContent}
                     </Link>
+                  ) : (
+                    <div
+                      key={session.id}
+                      className="grid items-center gap-3 border-b border-line"
+                      style={rowStyle}
+                    >
+                      {rowContent}
+                    </div>
                   );
                 })}
               </div>

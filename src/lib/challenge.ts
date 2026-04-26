@@ -2609,6 +2609,48 @@ interface ExpansionChallengeSeed {
   focus: string;
 }
 
+const SQL_ECOMMERCE_SCHEMA = `-- users
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50),
+  email VARCHAR(100),
+  age INT,
+  created_at TIMESTAMP
+);
+
+-- products
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100),
+  price INT,
+  category VARCHAR(50)
+);
+
+-- orders
+CREATE TABLE orders (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id),
+  total_price INT,
+  created_at TIMESTAMP
+);
+
+-- order_items
+CREATE TABLE order_items (
+  id SERIAL PRIMARY KEY,
+  order_id INT REFERENCES orders(id),
+  product_id INT REFERENCES products(id),
+  quantity INT
+);
+
+-- reviews
+CREATE TABLE reviews (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id),
+  product_id INT REFERENCES products(id),
+  rating INT,
+  comment TEXT
+);`;
+
 const EXPANSION_CHALLENGE_SEEDS: ExpansionChallengeSeed[] = [
   {
     slug: 'impl-json-transform-001',
@@ -3415,6 +3457,81 @@ const EXPANSION_CHALLENGE_SEEDS: ExpansionChallengeSeed[] = [
     focus: '조직 병목과 채용 우선순위',
   },
   {
+    slug: 'sql-recent-users-001',
+    title: '최근 가입한 사용자 3명 불러오기',
+    category: 'sql',
+    difficulty: 'easy',
+    estimatedMinutes: 6,
+    inputType: 'text',
+    inputDescription: 'users 테이블 스키마와 정렬 요구사항',
+    sample: `${SQL_ECOMMERCE_SCHEMA}
+
+요구사항: 가장 최근에 가입한 사용자 3명을 조회하세요.`,
+    task: 'users 테이블에서 created_at 기준으로 최근 가입한 사용자 3명을 불러오는 SQL 쿼리를 작성해야 합니다.',
+    outputFormat: '```sql\n-- query\n```',
+    focus: 'created_at 내림차순 정렬과 LIMIT 3 적용',
+  },
+  {
+    slug: 'sql-insert-user-001',
+    title: '새로운 사용자 추가하기',
+    category: 'sql',
+    difficulty: 'easy',
+    estimatedMinutes: 6,
+    inputType: 'text',
+    inputDescription: 'users 테이블 스키마와 INSERT 요구사항',
+    sample: `${SQL_ECOMMERCE_SCHEMA}
+
+요구사항: name, email, age, created_at 값을 가진 새로운 사용자를 추가하세요.`,
+    task: 'users 테이블에 새로운 사용자 한 명을 추가하는 SQL INSERT 문을 작성해야 합니다.',
+    outputFormat: '```sql\n-- query\n```',
+    focus: 'users 컬럼에 맞는 INSERT 문과 created_at 값 처리',
+  },
+  {
+    slug: 'sql-delete-one-star-reviews-001',
+    title: '리뷰 평점이 1점인 데이터 삭제하기',
+    category: 'sql',
+    difficulty: 'medium',
+    estimatedMinutes: 8,
+    inputType: 'text',
+    inputDescription: 'reviews 테이블 스키마와 삭제 조건',
+    sample: `${SQL_ECOMMERCE_SCHEMA}
+
+요구사항: rating이 1인 리뷰 데이터를 삭제하세요.`,
+    task: 'reviews 테이블에서 평점이 1점인 행만 삭제하는 SQL DELETE 문을 작성해야 합니다.',
+    outputFormat: '```sql\n-- query\n```',
+    focus: 'rating = 1 조건을 정확히 제한한 DELETE 문',
+  },
+  {
+    slug: 'sql-top-expensive-products-001',
+    title: '가장 비싼 상품 5개 불러오기',
+    category: 'sql',
+    difficulty: 'medium',
+    estimatedMinutes: 7,
+    inputType: 'text',
+    inputDescription: 'products 테이블 스키마와 정렬 요구사항',
+    sample: `${SQL_ECOMMERCE_SCHEMA}
+
+요구사항: price 기준으로 가장 비싼 상품 5개를 조회하세요.`,
+    task: 'products 테이블에서 가격이 높은 순서대로 상품 5개를 불러오는 SQL 쿼리를 작성해야 합니다.',
+    outputFormat: '```sql\n-- query\n```',
+    focus: 'price 내림차순 정렬과 LIMIT 5 적용',
+  },
+  {
+    slug: 'sql-users-with-three-orders-001',
+    title: '주문 3번 이상 한 사용자 불러오기',
+    category: 'sql',
+    difficulty: 'hard',
+    estimatedMinutes: 12,
+    inputType: 'text',
+    inputDescription: 'users와 orders 테이블 스키마 및 집계 요구사항',
+    sample: `${SQL_ECOMMERCE_SCHEMA}
+
+요구사항: orders 기준으로 주문을 3번 이상 한 사용자를 조회하세요.`,
+    task: 'users와 orders를 조인해 주문 횟수가 3번 이상인 사용자를 불러오는 SQL 쿼리를 작성해야 합니다.',
+    outputFormat: '```sql\n-- query\n```',
+    focus: 'users/orders 조인, 사용자별 GROUP BY, HAVING COUNT 조건',
+  },
+  {
     slug: 'impl-sql-report-001',
     title: '매출 리포트 SQL 생성',
     category: 'implementation',
@@ -3746,6 +3863,7 @@ function createExpansionChallenge(seed: ExpansionChallengeSeed): ChallengeDefini
     'security',
     'diagnosis',
     'review',
+    'sql',
   ].includes(seed.category);
 
   return {
@@ -3876,7 +3994,9 @@ export function extractCodeBlocks(content: string): CodeBlock[] {
 }
 
 export function buildSystemPrompt(taskDef: TaskDefinition): string {
-  const requirements = taskDef.requirements.map((requirement) => `- ${requirement.description}`).join('\n');
+  const requirements = taskDef.requirements
+    .map((requirement) => `- ${requirement.description}`)
+    .join('\n');
 
   return `당신은 개발자가 풀고 있는 다음 태스크를 돕는 AI 어시스턴트입니다.
 

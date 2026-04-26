@@ -103,6 +103,7 @@ export async function runEvaluationPipeline(sessionId: string): Promise<void> {
             judge_runs_succeeded: 0,
             judge_max_stddev: 0,
             is_low_confidence: true,
+            test_results: validatorResult.test_results,
           },
         })
         .eq('id', evaluation.id);
