@@ -49,25 +49,21 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    // Supabase 의 OTP 토큰 type 은 발송 시점에 결정됨:
-    // - 신규 가입 (Confirm Signup 템플릿) → 'signup'
-    // - 재로그인 (Magic Link 템플릿) → 'email'
-    // 클라이언트에서 둘을 구분할 수 없으므로 'email' 먼저 시도, 실패 시 'signup' 으로 폴백.
-    let result = await supabase.auth.verifyOtp({
-      email,
-      token: code,
-      type: 'email',
-    });
-    if (result.error) {
-      result = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: 'signup',
-      });
+    // Supabase 의 OTP 토큰 type 은 발송 시점/사용자 상태에 따라 다름:
+    // - 신규 가입 (Confirm email ON) → 'signup'
+    // - 신규 가입 (Confirm email OFF) → 'email'
+    // - 기존 confirmed 사용자 재로그인 → 'recovery' (auth log: user_recovery_requested)
+    // - Magic Link 클릭 흐름 → 'magiclink'
+    // 클라이언트는 사용자 상태를 모르므로 4가지 type 을 순서대로 폴백.
+    const types = ['email', 'recovery', 'magiclink', 'signup'] as const;
+    let result: Awaited<ReturnType<typeof supabase.auth.verifyOtp>> | null = null;
+    for (const type of types) {
+      result = await supabase.auth.verifyOtp({ email, token: code, type });
+      if (!result.error) break;
     }
 
     setLoading(false);
-    if (result.error) {
+    if (!result || result.error) {
       setError('잘못된 코드이거나 만료되었습니다.');
       return;
     }
