@@ -30,6 +30,10 @@ export async function validateArtifact(
   taskDefinition: TaskDefinition,
   artifact: string,
 ): Promise<ValidatorResult> {
+  if (taskDefinition.artifact_format.type === 'regex') {
+    return validateRegexArtifact(taskDefinition, artifact.trim());
+  }
+
   if (!Deno.env.get('OPENAI_API_KEY')) {
     return heuristicValidateArtifact(taskDefinition, artifact);
   }
@@ -141,8 +145,8 @@ function heuristicValidateArtifact(
 }
 
 function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string): ValidatorResult {
-  const regexLiteral = artifact.match(/\/((?:\\.|[^/])+)\/([a-z]*)/);
-  if (!regexLiteral) {
+  const regexParts = parseRegexArtifact(artifact);
+  if (!regexParts) {
     return {
       passed: false,
       passed_requirements: [],
@@ -154,7 +158,7 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
     };
   }
 
-  const [, pattern, flags] = regexLiteral;
+  const { pattern, flags } = regexParts;
   const failed_requirements: ValidatorResult['failed_requirements'] = [];
 
   try {
@@ -168,7 +172,9 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
       ].map((match) => match[0]);
       const expected = Array.isArray(testCase.expected_matches)
         ? testCase.expected_matches.filter((value): value is string => typeof value === 'string')
-        : [];
+        : Array.isArray(testCase.expected_output)
+          ? testCase.expected_output.filter((value): value is string => typeof value === 'string')
+          : [];
 
       if (JSON.stringify(matches) !== JSON.stringify(expected)) {
         failed_requirements.push({
@@ -213,6 +219,25 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
         ? 'OPENAI_API_KEY가 없어 정적 regex 검증으로 통과 처리했습니다.'
         : 'OPENAI_API_KEY가 없어 정적 regex 검증에서 실패했습니다.',
   };
+}
+
+function parseRegexArtifact(artifact: string): { pattern: string; flags: string } | null {
+  const trimmed = artifact
+    .trim()
+    .replace(/^```(?:regex|javascript|js|typescript|ts)?\s*/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  const literal = trimmed.match(/\/((?:\\.|[^/])+)\/([a-z]*)/);
+  if (literal) {
+    return { pattern: literal[1], flags: literal[2] };
+  }
+
+  if (!trimmed || /\s/.test(trimmed)) {
+    return null;
+  }
+
+  return { pattern: trimmed, flags: 'g' };
 }
 
 function artifactLooksImplemented(artifact: string, taskDefinition: TaskDefinition): boolean {

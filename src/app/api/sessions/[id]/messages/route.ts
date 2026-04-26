@@ -1,22 +1,116 @@
 import { NextResponse } from 'next/server';
-import { parse as parseYaml } from 'yaml';
-import type Anthropic from '@anthropic-ai/sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
-import { getAnthropicClient, CLAUDE_MODEL } from '@/lib/anthropic/client';
-import { buildSystemPrompt, extractCodeBlocks } from '@/lib/challenge';
-import type { TaskDefinition } from '@/lib/types/task';
-import type {
-  SendMessageRequest,
-  SendMessageResponse,
-  ApiError,
-} from '@/lib/api/contracts';
+import { getServerAiConfig } from '@/lib/ai-provider.server';
+import { extractCodeBlocks } from '@/lib/challenge';
+import type { SendMessageRequest, SendMessageResponse, ApiError } from '@/lib/api/contracts';
+
+type ConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+const BLIND_ASSISTANT_PROMPT =
+  '당신은 사용자의 지시만 보고 돕는 AI 어시스턴트입니다. 현재 화면의 문제, 요구사항, 채점 기준은 알 수 없습니다. 사용자가 제공한 정보 안에서만 답하고, 필요한 정보가 부족하면 문제 내용이나 요구사항을 붙여 달라고 요청하세요. 답변은 한국어로 간결하고 실용적으로 작성하세요.';
+
+async function generateAssistantMessage({
+  messages,
+}: {
+  messages: ConversationMessage[];
+}): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  const aiConfig = getServerAiConfig();
+  if (!aiConfig.apiKey) {
+    throw new Error(`${aiConfig.apiKeyEnvName}가 설정되지 않았습니다.`);
+  }
+
+  if (aiConfig.provider === 'gemini') {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${aiConfig.model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': aiConfig.apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: BLIND_ASSISTANT_PROMPT }],
+          },
+          contents: messages.map((message) => ({
+            role: message.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: message.content }],
+          })),
+          generationConfig: {
+            maxOutputTokens: 4096,
+          },
+        }),
+      },
+    );
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      promptFeedback?: { blockReason?: string };
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+      };
+      error?: { message?: string };
+    };
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || `${aiConfig.displayName} API 호출 실패`);
+    }
+    if (data.promptFeedback?.blockReason) {
+      throw new Error(
+        `${aiConfig.displayName}가 요청을 차단했습니다: ${data.promptFeedback.blockReason}`,
+      );
+    }
+
+    const content = data.candidates
+      ?.flatMap((candidate) => candidate.content?.parts ?? [])
+      .map((part) => part.text ?? '')
+      .join('\n')
+      .trim();
+
+    if (!content) {
+      throw new Error(`${aiConfig.displayName} 응답에서 텍스트를 찾지 못했습니다.`);
+    }
+
+    return {
+      content,
+      inputTokens: data.usageMetadata?.promptTokenCount ?? 0,
+      outputTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+    };
+  }
+
+  const anthropic = new Anthropic({ apiKey: aiConfig.apiKey });
+  const response = await anthropic.messages.create({
+    model: aiConfig.model,
+    max_tokens: 4096,
+    system: BLIND_ASSISTANT_PROMPT,
+    messages,
+  });
+
+  const content = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n')
+    .trim();
+
+  if (!content) {
+    throw new Error(`${aiConfig.displayName} 응답에서 텍스트를 찾지 못했습니다.`);
+  }
+
+  return {
+    content,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
+}
 
 // POST /api/sessions/[id]/messages — Claude 호출 + 메시지 저장
 // 사양: docs/06-api-endpoints.md §6.1
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: sessionId } = await params;
   const supabase = await createClient();
 
@@ -49,10 +143,10 @@ export async function POST(
 
   // TODO(day8): limits.message (20/min) — Upstash 환경 설정 후 추가.
 
-  // 세션 + 태스크 조회. RLS 가 본인 세션만 허용.
+  // 세션 조회. RLS 가 본인 세션만 허용.
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, status, message_count, tasks(yaml_definition)')
+    .select('id, status, message_count')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -77,23 +171,6 @@ export async function POST(
         },
       },
       { status: 429 },
-    );
-  }
-
-  // 태스크 YAML 파싱
-  type TaskJoin = { yaml_definition: string } | { yaml_definition: string }[] | null;
-  const taskJoin = (session as unknown as { tasks: TaskJoin }).tasks;
-  const yamlText = Array.isArray(taskJoin)
-    ? (taskJoin[0]?.yaml_definition ?? '')
-    : (taskJoin?.yaml_definition ?? '');
-
-  let taskDef: TaskDefinition;
-  try {
-    taskDef = parseYaml(yamlText) as TaskDefinition;
-  } catch {
-    return NextResponse.json<ApiError>(
-      { error: { code: 'INTERNAL_ERROR', message: '태스크 YAML 파싱 실패' } },
-      { status: 500 },
     );
   }
 
@@ -130,26 +207,20 @@ export async function POST(
   let inputTokens = 0;
   let outputTokens = 0;
   try {
-    const anthropic = getAnthropicClient();
-    const response = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4096,
-      system: buildSystemPrompt(taskDef),
+    const completion = await generateAssistantMessage({
       messages: [
-        ...(history ?? []).map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })),
-        { role: 'user' as const, content: body.content },
+        ...(history ?? [])
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })),
+        { role: 'user', content: body.content },
       ],
     });
-
-    aiText = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('\n');
-    inputTokens = response.usage.input_tokens;
-    outputTokens = response.usage.output_tokens;
+    aiText = completion.content;
+    inputTokens = completion.inputTokens;
+    outputTokens = completion.outputTokens;
   } catch (err) {
     return NextResponse.json<ApiError>(
       {

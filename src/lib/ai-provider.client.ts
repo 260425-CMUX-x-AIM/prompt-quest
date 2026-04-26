@@ -11,7 +11,7 @@ export function getClientAiConfig(): ClientAiConfig {
 
   return {
     provider,
-    displayName: 'Ai Bot',
-    modelLabel: 'Ai Bot',
+    displayName: 'AI Bot',
+    modelLabel: 'AI Bot',
   };
 }
