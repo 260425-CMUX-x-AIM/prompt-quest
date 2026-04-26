@@ -16,6 +16,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { id: 'tasks', label: 'Tasks', href: '/tasks' },
   { id: 'leaderboard', label: 'Leaderboard', href: '/leaderboard' },
+  { id: 'pricing', label: 'Pricing', href: '/pricing' },
   { id: 'me', label: 'My', href: '/me' },
 ];
 
@@ -63,6 +64,7 @@ export default function NavBar() {
   const getActive = () => {
     if (pathname.startsWith('/tasks') || pathname.startsWith('/challenge')) return 'tasks';
     if (pathname.startsWith('/leaderboard')) return 'leaderboard';
+    if (pathname.startsWith('/pricing')) return 'pricing';
     if (pathname.startsWith('/my-dojo') || pathname.startsWith('/me')) return 'me';
     return '';
   };
