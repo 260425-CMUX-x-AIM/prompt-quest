@@ -36,16 +36,30 @@ export async function validateArtifact(
 [태스크]
 ${challenge.title}
 
+[입력]
+${challenge.inputSpec ? `${challenge.inputSpec.type}: ${challenge.inputSpec.description}` : '별도 입력 스펙 없음'}
+
+[원본 자료]
+${challenge.sourceMaterial ? `\`\`\`${challenge.sourceMaterial.language}\n${challenge.sourceMaterial.content}\n\`\`\`` : '별도 원본 자료 없음'}
+
 [요구사항]
-${challenge.requirements.map((item) => `- ${item.id}: ${item.description}`).join('\n')}
+${challenge.requirements
+  .map((item) => `- ${item.id} (weight ${item.weight}): ${item.description}`)
+  .join('\n')}
 
 [테스트케이스]
 ${challenge.testCases
   .map(
     (testCase) =>
-      `- ${testCase.id} (${testCase.type})\n  입력: ${testCase.input}\n  기대: ${JSON.stringify(testCase.expected)}`,
+      `- ${testCase.id} (${testCase.type})\n  입력/시나리오: ${testCase.input ?? testCase.scenario}\n  기대: ${JSON.stringify(testCase.expected)}`,
   )
   .join('\n')}
+
+[숨김 체크]
+${challenge.hiddenChecks.map((item) => `- ${item}`).join('\n')}
+
+[PASS 조건]
+${challenge.passConditions.map((item) => `- ${item}`).join('\n')}
 
 [결과물 형식]
 ${challenge.outputFormat}

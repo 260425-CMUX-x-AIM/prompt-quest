@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 import { getServerAiConfig } from '@/lib/ai-provider.server';
-import { HARD_CODED_CHALLENGE } from '@/lib/challenge';
+import { getChallengeDefinition } from '@/lib/challenge';
 
 interface IncomingMessage {
   role: 'user' | 'assistant';
@@ -14,7 +14,8 @@ interface ChatRequestBody {
   messages?: IncomingMessage[];
 }
 
-function buildSystemPrompt(artifact?: string) {
+function buildSystemPrompt(slug?: string, artifact?: string) {
+  const challenge = getChallengeDefinition(slug);
   const artifactSection = artifact?.trim()
     ? `Current artifact:
 \`\`\`javascript
@@ -27,16 +28,21 @@ If you revise the artifact, return the full updated artifact in one fenced code 
   return `You are helping a user solve one coding challenge.
 
 Challenge:
-- Title: ${HARD_CODED_CHALLENGE.title}
-- Scenario: ${HARD_CODED_CHALLENGE.scenario}
+- Title: ${challenge.title}
+- Scenario: ${challenge.scenario}
+${challenge.inputSpec ? `- Input: ${challenge.inputSpec.type} · ${challenge.inputSpec.description}` : ''}
+- Source material:
+${challenge.sourceMaterial ? `\`\`\`${challenge.sourceMaterial.language}\n${challenge.sourceMaterial.content}\n\`\`\`` : '  없음'}
 - Requirements:
-${HARD_CODED_CHALLENGE.requirements.map((item) => `  - ${item.id}: ${item.description}`).join('\n')}
-- Output format: ${HARD_CODED_CHALLENGE.outputFormat}
+${challenge.requirements.map((item) => `  - ${item.id}: ${item.description}`).join('\n')}
+- Output format: ${challenge.outputFormat}
+- Pass conditions:
+${challenge.passConditions.map((item) => `  - ${item}`).join('\n')}
 
 Rules:
 - Answer in Korean.
 - Be concise and practical.
-- When proposing code, prefer JavaScript.
+- Match the requested output format. Only use code when the task asks for code.
 - If you provide or update the solution artifact, include exactly one fenced code block with the full artifact.
 - Reference the user's latest request and previous artifact when relevant.
 
@@ -84,7 +90,7 @@ export async function POST(request: Request) {
           },
           body: JSON.stringify({
             systemInstruction: {
-              parts: [{ text: buildSystemPrompt(body.artifact) }],
+              parts: [{ text: buildSystemPrompt(body.slug, body.artifact) }],
             },
             contents: messages.map((message) => ({
               role: message.role === 'assistant' ? 'model' : 'user',
@@ -160,7 +166,7 @@ export async function POST(request: Request) {
     const response = await anthropic.messages.create({
       model: aiConfig.model,
       max_tokens: 1400,
-      system: buildSystemPrompt(body.artifact),
+      system: buildSystemPrompt(body.slug, body.artifact),
       messages,
     });
 

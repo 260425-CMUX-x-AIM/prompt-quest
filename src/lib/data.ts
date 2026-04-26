@@ -1,3 +1,5 @@
+import { HARD_CODED_CHALLENGES } from '@/lib/challenge';
+
 export interface Task {
   slug: string;
   title: string;
@@ -10,135 +12,57 @@ export interface Task {
   locked?: boolean;
 }
 
-export const ALL_TASKS: Task[] = [
-  {
-    slug: 'regex-email-001',
-    title: '이메일 추출 정규식 작성',
-    cat: 'regex',
-    diff: 'easy',
-    mins: 5,
-    completed: 'best:92',
-    attempts: 423,
-    completion: 0.74,
-  },
-  {
-    slug: 'debug-async-001',
-    title: 'Promise 체이닝 버그 수정',
-    cat: 'debug',
-    diff: 'easy',
-    mins: 6,
-    completed: 'best:78',
-    attempts: 312,
-    completion: 0.81,
-  },
-  {
-    slug: 'review-pr-001',
-    title: '신규 API PR 코드 리뷰',
-    cat: 'review',
-    diff: 'easy',
-    mins: 8,
-    completed: null,
-    attempts: 198,
-    completion: 0.65,
-  },
-  {
-    slug: 'component-pagination-001',
-    title: 'React 페이지네이션 컴포넌트',
-    cat: 'component',
-    diff: 'medium',
-    mins: 15,
-    completed: 'best:84',
-    attempts: 256,
-    completion: 0.58,
-  },
-  {
-    slug: 'algo-sort-001',
-    title: '객체 배열 다중 키 정렬',
-    cat: 'algo',
-    diff: 'medium',
-    mins: 12,
-    completed: null,
-    attempts: 187,
-    completion: 0.62,
-  },
-  {
-    slug: 'api-design-001',
-    title: 'REST API 리소스 설계',
-    cat: 'api_design',
-    diff: 'medium',
-    mins: 18,
-    completed: null,
-    attempts: 142,
-    completion: 0.51,
-  },
-  {
-    slug: 'test-mock-001',
-    title: 'Jest mock 전략 수립',
-    cat: 'test',
-    diff: 'medium',
-    mins: 14,
-    completed: null,
-    attempts: 98,
-    completion: 0.55,
-  },
-  {
-    slug: 'arch-event-001',
-    title: '이벤트 드리븐 아키텍처',
-    cat: 'arch',
-    diff: 'hard',
-    mins: 35,
-    completed: null,
-    attempts: 43,
-    completion: 0.32,
-    locked: true,
-  },
-  {
-    slug: 'refactor-legacy-001',
-    title: '콜백 헬을 async/await로',
-    cat: 'refactor',
-    diff: 'hard',
-    mins: 28,
-    completed: null,
-    attempts: 67,
-    completion: 0.41,
-  },
-  {
-    slug: 'security-xss-001',
-    title: 'XSS 취약점 진단',
-    cat: 'security',
-    diff: 'hard',
-    mins: 30,
-    completed: null,
-    attempts: 51,
-    completion: 0.38,
-    locked: true,
-  },
-  {
-    slug: 'perf-react-001',
-    title: 'React 렌더링 병목 분석',
-    cat: 'perf',
-    diff: 'hard',
-    mins: 32,
-    completed: null,
-    attempts: 39,
-    completion: 0.36,
-    locked: true,
-  },
-];
+const TASK_STATS: Record<string, Pick<Task, 'attempts' | 'completion' | 'completed' | 'locked'>> = {
+  'regex-email-001': { completed: 'best:92', attempts: 423, completion: 0.74 },
+  'debug-async-001': { completed: 'best:78', attempts: 312, completion: 0.81 },
+  'review-pr-001': { completed: null, attempts: 198, completion: 0.65 },
+  'debug-date-001': { completed: null, attempts: 126, completion: 0.68 },
+  'regex-log-redact-001': { completed: null, attempts: 144, completion: 0.71 },
+  'debug-null-state-001': { completed: null, attempts: 118, completion: 0.69 },
+  'review-rate-limit-001': { completed: null, attempts: 104, completion: 0.57 },
+  'component-pagination-001': { completed: 'best:84', attempts: 256, completion: 0.58 },
+  'algo-sort-001': { completed: null, attempts: 187, completion: 0.62 },
+  'api-design-001': { completed: null, attempts: 142, completion: 0.51 },
+  'test-mock-001': { completed: null, attempts: 98, completion: 0.55 },
+  'component-command-palette-001': { completed: null, attempts: 91, completion: 0.49 },
+  'algo-rate-limit-001': { completed: null, attempts: 84, completion: 0.46 },
+  'test-contract-001': { completed: null, attempts: 76, completion: 0.44 },
+  'arch-event-001': { completed: null, attempts: 43, completion: 0.32, locked: true },
+  'refactor-legacy-001': { completed: null, attempts: 67, completion: 0.41 },
+  'security-xss-001': { completed: null, attempts: 51, completion: 0.38, locked: true },
+  'perf-react-001': { completed: null, attempts: 39, completion: 0.36, locked: true },
+  'security-ssrf-001': { completed: null, attempts: 34, completion: 0.31, locked: true },
+  'perf-sql-001': { completed: null, attempts: 29, completion: 0.29, locked: true },
+  'arch-multitenant-001': { completed: null, attempts: 22, completion: 0.27, locked: true },
+};
 
-export const CATEGORIES = [
-  'regex',
-  'debug',
-  'review',
-  'component',
-  'algo',
-  'api_design',
-  'test',
-  'arch',
-  'refactor',
-  'security',
-  'perf',
-] as const;
+function getTaskStats(challenge: (typeof HARD_CODED_CHALLENGES)[number]) {
+  const fallback = {
+    easy: { completed: null, attempts: 86, completion: 0.67 },
+    medium: { completed: null, attempts: 54, completion: 0.46 },
+    hard: { completed: null, attempts: 21, completion: 0.28, locked: true },
+  } satisfies Record<Task['diff'], Pick<Task, 'attempts' | 'completion' | 'completed' | 'locked'>>;
+
+  return TASK_STATS[challenge.slug] ?? fallback[challenge.difficulty];
+}
+
+export const ALL_TASKS: Task[] = HARD_CODED_CHALLENGES.map((challenge) => {
+  const stats = getTaskStats(challenge);
+
+  return {
+    slug: challenge.slug,
+    title: challenge.title,
+    cat: challenge.category,
+    diff: challenge.difficulty,
+    mins: challenge.estimatedMinutes,
+    completed: stats.completed,
+    attempts: stats.attempts,
+    completion: stats.completion,
+    locked: stats.locked,
+  };
+});
+
+export const CATEGORIES = [...new Set(ALL_TASKS.map((task) => task.cat))] as string[];
 
 export interface ChatMessage {
   role: 'user' | 'assistant';

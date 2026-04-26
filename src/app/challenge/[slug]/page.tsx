@@ -377,6 +377,36 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
             {challengeDef.scenario}
           </p>
 
+          {challengeDef.sourceMaterial ? (
+            <>
+              <div
+                className="font-mono text-text-3 mb-2"
+                style={{ fontSize: 9.5, letterSpacing: '0.08em' }}
+              >
+                SOURCE
+              </div>
+              <div className="border border-line rounded-md mb-5.5 overflow-hidden">
+                <div
+                  className="flex items-center justify-between bg-bg-1 border-b border-line"
+                  style={{ padding: '6px 8px' }}
+                >
+                  <span className="text-text-2" style={{ fontSize: 10.5 }}>
+                    {challengeDef.sourceMaterial.title}
+                  </span>
+                  <span className="font-mono text-text-3" style={{ fontSize: 9.5 }}>
+                    {challengeDef.sourceMaterial.language}
+                  </span>
+                </div>
+                <pre
+                  className="font-mono overflow-x-auto whitespace-pre-wrap bg-[#0a0c0f] max-h-[240px]"
+                  style={{ margin: 0, padding: '10px', fontSize: 10.5, lineHeight: 1.55 }}
+                >
+                  {challengeDef.sourceMaterial.content}
+                </pre>
+              </div>
+            </>
+          ) : null}
+
           <div
             className="font-mono text-text-3 mb-2.5"
             style={{ fontSize: 9.5, letterSpacing: '0.08em' }}

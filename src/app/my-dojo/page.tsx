@@ -1,22 +1,17 @@
 'use client';
 
-import { useMemo } from 'react';
 import NavBar from '@/components/NavBar';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import ProgressBar from '@/components/ProgressBar';
 import Sparkline from '@/components/Sparkline';
 import { HISTORY } from '@/lib/data';
 
-export default function MyDojoPage() {
-  const activityData = useMemo(
-    () =>
-      Array.from({ length: 84 }).map(() => {
-        const v = Math.random();
-        return v < 0.4 ? 0 : v < 0.6 ? 1 : v < 0.85 ? 2 : 3;
-      }),
-    [],
-  );
+const ACTIVITY_DATA = Array.from({ length: 84 }).map((_, index) => {
+  const value = (index * 37 + 11) % 100;
+  return value < 40 ? 0 : value < 60 ? 1 : value < 85 ? 2 : 3;
+});
 
+export default function MyDojoPage() {
   const intensityColors = [
     'var(--color-bg-3)',
     'oklch(0.86 0.20 130 / 0.3)',
@@ -111,8 +106,7 @@ export default function MyDojoPage() {
                     style={{
                       gridTemplateColumns: '60px 1fr 100px 80px 60px 60px 60px',
                       padding: '12px 16px',
-                      borderBottom:
-                        i < HISTORY.length - 1 ? '1px solid var(--color-line)' : 'none',
+                      borderBottom: i < HISTORY.length - 1 ? '1px solid var(--color-line)' : 'none',
                       opacity: 'abandoned' in h && h.abandoned ? 0.45 : 1,
                     }}
                   >
@@ -181,9 +175,7 @@ export default function MyDojoPage() {
                       </span>
                       <ProgressBar
                         value={(v as number) * 10}
-                        color={
-                          (v as number) >= 8 ? 'var(--color-acc)' : 'var(--color-warn)'
-                        }
+                        color={(v as number) >= 8 ? 'var(--color-acc)' : 'var(--color-warn)'}
                         height={5}
                       />
                       <span className="font-mono text-right" style={{ fontSize: 12 }}>
@@ -205,7 +197,7 @@ export default function MyDojoPage() {
               </div>
               <div className="bg-bg-1 border border-line rounded-[10px] p-3.5 mb-5">
                 <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
-                  {activityData.map((intensity, i) => (
+                  {ACTIVITY_DATA.map((intensity, i) => (
                     <div
                       key={i}
                       className="rounded-[2px]"

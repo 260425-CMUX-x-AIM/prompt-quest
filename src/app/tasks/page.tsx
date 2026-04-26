@@ -87,6 +87,13 @@ export default function TasksPage() {
   const [diff, setDiff] = useState('all');
   const [cat, setCat] = useState('all');
   const [q, setQ] = useState('');
+  const difficultyCounts = {
+    all: ALL_TASKS.length,
+    easy: ALL_TASKS.filter((task) => task.diff === 'easy').length,
+    medium: ALL_TASKS.filter((task) => task.diff === 'medium').length,
+    hard: ALL_TASKS.filter((task) => task.diff === 'hard').length,
+  };
+  const completedCount = ALL_TASKS.filter((task) => task.completed).length;
 
   const filtered = ALL_TASKS.filter((t) => {
     if (diff !== 'all' && t.diff !== diff) return false;
@@ -113,10 +120,10 @@ export default function TasksPage() {
           <div className="flex flex-col gap-1 mb-6">
             {(
               [
-                ['all', 'All', 11],
-                ['easy', 'Easy', 3],
-                ['medium', 'Medium', 4],
-                ['hard', 'Hard', 4],
+                ['all', 'All', difficultyCounts.all],
+                ['easy', 'Easy', difficultyCounts.easy],
+                ['medium', 'Medium', difficultyCounts.medium],
+                ['hard', 'Hard', difficultyCounts.hard],
               ] as const
             ).map(([k, l, c]) => (
               <div
@@ -184,7 +191,7 @@ export default function TasksPage() {
                   Tasks
                 </h1>
                 <div className="text-text-3 mt-1" style={{ fontSize: 12 }}>
-                  {filtered.length} of {ALL_TASKS.length} tasks · 2 completed
+                  {filtered.length} of {ALL_TASKS.length} tasks · {completedCount} completed
                 </div>
               </div>
               <div className="flex gap-2">

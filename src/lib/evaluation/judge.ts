@@ -46,6 +46,14 @@ export async function judgeConversation(
 [태스크]
 ${challenge.title}
 
+[고득점 가이드]
+${challenge.highScoreGuides.map((item) => `- ${item}`).join('\n')}
+
+[패턴 보너스/페널티]
+${challenge.patternBonus
+  .map((item) => `${item.score > 0 ? '+' : ''}${item.score}: ${item.description}`)
+  .join('\n')}
+
 [대화]
 <conversation>
 ${messages.map((message) => `[${message.role}]\n${message.content}`).join('\n\n---\n\n')}
