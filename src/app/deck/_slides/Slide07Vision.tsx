@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { SlideShell } from './SlideShell';
 
 const STEPS = [
-  { tag: 'NOW', title: 'MVP — 11 카테고리 quest', sub: '풀이 → 채점 → 백분위 (라이브)' },
+  { tag: 'NOW', title: 'MVP — 5 영역 시드 quest', sub: 'regex · debug · component · algo · refactor (라이브)' },
   { tag: 'Q3', title: '리더보드 + Elo', sub: '개발자 간 상대 비교 + 도전' },
   { tag: 'Q4', title: 'B2B 팀 워크스페이스', sub: '사내 quest, 채용 통합 파일럿' },
   {

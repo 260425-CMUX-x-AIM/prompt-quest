@@ -57,7 +57,7 @@ export function Slide08Closing({ index, total }: { index: number; total: number 
         >
           {[
             ['BUILD', '12d × 2 devs', '영업일 2인 팀 sprint'],
-            ['1M TARGETS', '100 MAU · 50%', '완료율 (≥1 quest) · 30% 재방문'],
+            ['M1 TARGETS', '100 MAU · 50%', '완료율 (≥1 quest) · 30% 재방문'],
           ].map(([k, v, d]) => (
             <div key={k} className="flex flex-col">
               <span
