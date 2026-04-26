@@ -69,8 +69,8 @@ export function Slide04Demo({ index, total }: { index: number; total: number }) 
             <span className="text-acc">점수까지.</span>
           </h2>
           <p className="text-text-2 mt-5" style={{ fontSize: 15, lineHeight: 1.55 }}>
-            사용자 메시지 → AI 응답 → 4단계 채점까지 한 흐름. 파이프라인은 실구현 (validator · judge ·
-            quantitative · aggregator), 점수는 정량 28 + 정성 30 + 게이팅 40으로 결정됩니다.
+            사용자 메시지 → AI 응답 → 4단계 채점까지 한 흐름. 점수는 정량 28 + 정성 30 + 게이팅
+            40으로 결정됩니다.
           </p>
           <div className="mt-7 flex flex-col gap-2">
             {[

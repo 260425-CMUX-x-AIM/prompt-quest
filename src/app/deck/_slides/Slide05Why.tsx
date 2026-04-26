@@ -8,8 +8,8 @@ const ROWS: { label: string; old: string; pq: string }[] = [
   { label: '평가 신호', old: '정답률 only', pq: '정확성 40 + 효율 30 + 협업 30 ± 패턴 5' },
   {
     label: '편향',
-    old: '동일 모델 자기 채점',
-    pq: 'Cross-family — Claude (대화) ⟂ GPT-4o-mini (채점)',
+    old: '동일 AI 자기 채점',
+    pq: '풀이 에이전트와 채점 에이전트를 분리',
   },
   { label: '재현성', old: '면접관 직감', pq: '3회 앙상블 σ<5 · 골든 셋 MAE<8 회귀' },
 ];

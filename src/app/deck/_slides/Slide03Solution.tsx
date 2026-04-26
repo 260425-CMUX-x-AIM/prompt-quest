@@ -37,10 +37,9 @@ export function Slide03Solution({ index, total }: { index: number; total: number
           실전 quest를 풀고, <span className="text-acc">4단계로 채점</span>한다.
         </h2>
         <p className="text-text-2 mt-5" style={{ fontSize: 18, lineHeight: 1.55, maxWidth: 920 }}>
-          개발자는 풀이용 AI와 대화하며 실제 업무 태스크를 풀고, 결과물은 다른 모델 패밀리의 채점
-          에이전트가 채점합니다 —{' '}
-          <span className="text-text-1">Claude (대화) ⟂ GPT-4o-mini (채점)</span>. 자기 채점 편향을
-          모델 패밀리 단위로 차단합니다.
+          개발자는 풀이용 AI 에이전트와 대화하며 실제 업무 태스크를 풀고, 결과물은 별도의 채점
+          에이전트가 평가합니다. 풀이와 채점을 서로 다른 에이전트로 분리해 자기 채점 편향을
+          차단합니다.
         </p>
 
         <div className="grid grid-cols-4 mt-12" style={{ gap: 16, position: 'relative' }}>
