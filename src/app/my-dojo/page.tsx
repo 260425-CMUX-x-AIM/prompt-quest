@@ -1,22 +1,19 @@
 'use client';
 
-import { useMemo } from 'react';
 import NavBar from '@/components/NavBar';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import ProgressBar from '@/components/ProgressBar';
 import Sparkline from '@/components/Sparkline';
 import { HISTORY } from '@/lib/data';
 
-export default function MyDojoPage() {
-  const activityData = useMemo(
-    () =>
-      Array.from({ length: 84 }).map(() => {
-        const v = Math.random();
-        return v < 0.4 ? 0 : v < 0.6 ? 1 : v < 0.85 ? 2 : 3;
-      }),
-    [],
-  );
+// 정적 데모용 활동 데이터 — 결정적 시드로 생성해 React Compiler의 render 순수성 규칙 만족.
+// (Day 8에서 /me 페이지로 재작성되며 실 데이터로 교체됨)
+const activityData = Array.from({ length: 84 }).map((_, i) => {
+  const v = ((i * 9301 + 49297) % 233280) / 233280;
+  return v < 0.4 ? 0 : v < 0.6 ? 1 : v < 0.85 ? 2 : 3;
+});
 
+export default function MyDojoPage() {
   const intensityColors = [
     'var(--color-bg-3)',
     'oklch(0.86 0.20 130 / 0.3)',
@@ -111,8 +108,7 @@ export default function MyDojoPage() {
                     style={{
                       gridTemplateColumns: '60px 1fr 100px 80px 60px 60px 60px',
                       padding: '12px 16px',
-                      borderBottom:
-                        i < HISTORY.length - 1 ? '1px solid var(--color-line)' : 'none',
+                      borderBottom: i < HISTORY.length - 1 ? '1px solid var(--color-line)' : 'none',
                       opacity: 'abandoned' in h && h.abandoned ? 0.45 : 1,
                     }}
                   >
@@ -181,9 +177,7 @@ export default function MyDojoPage() {
                       </span>
                       <ProgressBar
                         value={(v as number) * 10}
-                        color={
-                          (v as number) >= 8 ? 'var(--color-acc)' : 'var(--color-warn)'
-                        }
+                        color={(v as number) >= 8 ? 'var(--color-acc)' : 'var(--color-warn)'}
                         height={5}
                       />
                       <span className="font-mono text-right" style={{ fontSize: 12 }}>
