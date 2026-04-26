@@ -40,7 +40,7 @@ function MessageBubble({
   onAddToArtifact: (block: CodeBlock) => void;
 }) {
   const isUser = msg.role === 'user';
-  const blocks = msg.extracted_code_blocks?.blocks ?? [];
+  const blocks = (msg.extracted_code_blocks?.blocks ?? []).slice(-1);
   return (
     <div
       className="flex gap-3 border-b border-line"
