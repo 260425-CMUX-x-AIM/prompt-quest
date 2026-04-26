@@ -1,60 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PromptQuest
 
-## Getting Started
+> AI를 잘 쓰는 개발자가 점수로 증명되는 곳.
 
-First, run the development server:
+<img width="1280" height="640" alt="promptquest-social" src="https://github.com/user-attachments/assets/f3b95b7f-1455-4adb-89b2-07610614a952" />
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 우리가 푸는 문제
+
+전 세계 개발자 **85%** 가 AI 도구를 정기적으로 씁니다. 그런데 "누가 잘 쓰는가"를 가려낼 표준 지표는 **단 하나도** 없습니다.
+
+- 채용은 면접관의 **직감** 으로 판단합니다.
+- 코딩 테스트는 AI 사용을 **금지** 합니다.
+- AI 사용자의 1순위 우려는 여전히 **"생성 코드 품질"** 입니다.
+
+다 쓰는데, 결과를 검증할 도구가 없습니다.
+
+PromptQuest는 이 문제를 풉니다.
+
+---
+
+## 무엇을 하는 서비스인가
+
+**실제 업무 시나리오 quest를 AI와 함께 풀게 하고, 그 과정과 결과를 점수로 환산** 합니다.
+
+quest 하나는 실무에서 마주칠 법한 한 덩어리의 작업입니다 — "이메일 추출 정규식을 ReDoS 안전하게 만들기", "주어진 API 응답을 정리해 대시보드에 꽂을 수 있는 형태로 가공하기" 같은. 사용자는 AI와 대화하며 이 quest를 풀이하고, 제출하는 순간 점수가 산출됩니다.
+
+점수는 다음 공식으로 계산됩니다.
+
+```
+100점 = 정확성 40 + 효율 30 + 협업 30 ± 패턴 보정 5
+        결과물이 부적절하면 → 전체 0점
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **정확성 40점** — 결과물이 quest의 요구사항과 제약을 통과했는가
+- **효율 30점** — 토큰·시도·시간을 베이스라인 대비 얼마나 아꼈는가
+- **협업 30점** — 프롬프트의 명확성, 맥락 제공, 실패 시 복구 능력
+- **패턴 보정 ± 5점** — 난이도와 풀이 패턴에 대한 후보정
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+프롬프트만 좋다고 점수를 받지 못합니다. 결과물이 quest 기준을 넘지 못하면 게이트에서 **0점** 으로 떨어집니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 무엇이 다른가
 
-To learn more about Next.js, take a look at the following resources:
+|           | 기존 코딩 테스트 | PromptQuest                            |
+| --------- | ---------------- | -------------------------------------- |
+| AI 사용   | 금지             | **필수**                               |
+| 평가 신호 | 단일 정답률      | 정확성 40 + 효율 30 + 협업 30          |
+| 채점      | 자기 채점        | **분리된 에이전트** — 풀이와 채점 분리 |
+| 재현성    | 면접관 감        | 앙상블 채점의 분산·골든 셋 회귀 기준   |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+핵심은 두 가지입니다.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **풀이하는 AI와 채점하는 AI를 분리** — 같은 모델 계열이 자기 결과를 채점하지 않습니다. 자기 채점 편향을 차단하기 위해서입니다.
+2. **앙상블 + 절대평가 게이트** — 채점은 여러 번 돌려 분산을 측정하고, 분산이 임계값을 넘으면 신뢰도 메타를 함께 보여줍니다. 결과물이 quest의 절대 기준을 못 넘기면 합산 점수와 무관하게 **0점** 입니다.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 사용자가 보는 한 흐름
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+quest 선택  →  AI와 대화하며 풀이  →  결과물 제출
+                                          │
+                                          ▼
+                                  4단계 채점 파이프라인
+                                          │
+                                          ▼
+            87 / 100      백분위 상위 24%      신뢰도 σ=2.1
+            ─────────
+            정확성 40 · 효율 27 · 협업 22 · 패턴 −2
 
-## AI Provider Switch
-
-Switching between Claude and Gemini is controlled by env vars, not code changes.
-
-```bash
-AI_PROVIDER=claude
-NEXT_PUBLIC_AI_PROVIDER=claude
-
-# Claude
-ANTHROPIC_API_KEY=...
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
-
-# Gemini
-# GEMINI_API_KEY=...
-# GEMINI_MODEL=gemini-2.5-flash
-
-# Optional UI label override
-NEXT_PUBLIC_AI_MODEL_LABEL=claude-sonnet-4-5
+            잘한 점 / 개선할 점 / 다음에 풀어볼 quest
 ```
 
-- Set `AI_PROVIDER` to `claude` or `gemini` for the server route.
-- Set `NEXT_PUBLIC_AI_PROVIDER` to the same value so the challenge UI label matches.
-- If you want a custom model label in the UI, set `NEXT_PUBLIC_AI_MODEL_LABEL`.
+채점 결과는 단일 숫자가 아닙니다. **항목별 점수, 백분위, 잘한 점, 개선할 점, 다음에 도전할 quest** 가 함께 제공됩니다.
+
+---
+
+## 누구를 위해 만들었나
+
+- **AI 도구를 업무에 쓰는 개발자** — 내가 정말 잘 쓰고 있는지, 어디가 약한지 객관적으로 점검하고 싶은 사람.
+- **AI 역량을 가시화하고 싶은 팀/회사** — 채용 스크리닝, 사내 교육, 역량 리포트가 필요한 조직.
+- **AI 활용 능력을 증명하고 싶은 사람** — "AI를 잘 쓴다"를 점수로 보여주고 싶은 사람.
+
+---
+
+## 우리가 가는 길
+
+| 단계     | 내용                                              |
+| -------- | ------------------------------------------------- |
+| **NOW**  | 5개 영역의 시드 quest로 라이브 운영               |
+| **Q3**   | 리더보드 · Elo 레이팅                             |
+| **Q4**   | B2B 팀 워크스페이스 · 채용 스크리닝 · 사내 리포트 |
+| **NEXT** | **PromptQuest Score 가 이력서의 한 줄이 되는 것** |
+
+---
+
+## 한 줄로
+
+> AI는 이제 누구나 씁니다. **잘 쓰는 사람을 가려내는 표준** 은 아직 없습니다.
+> PromptQuest는 그 표준을 만듭니다.
