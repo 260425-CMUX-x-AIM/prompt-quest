@@ -5,17 +5,25 @@ import Link from 'next/link';
 import NavBar from '@/components/NavBar';
 
 export default function LandingPage() {
-  const fullText = '> training: prompt → judge → score';
+  const userPrompt = '이메일 추출 정규식 만들어줘. 도메인에 dot 최소 1개, ReDoS 안전해야 해.';
   const [typed, setTyped] = useState('');
+  const [phase, setPhase] = useState(0); // 0:typing 1:user-sent 2:ai-thinking 3:ai-reply 4:scoring 5:done
 
   useEffect(() => {
     let i = 0;
-    const t = setInterval(() => {
+    const typer = setInterval(() => {
       i++;
-      setTyped(fullText.slice(0, i));
-      if (i >= fullText.length) clearInterval(t);
-    }, 45);
-    return () => clearInterval(t);
+      setTyped(userPrompt.slice(0, i));
+      if (i >= userPrompt.length) {
+        clearInterval(typer);
+        setTimeout(() => setPhase(1), 400);
+        setTimeout(() => setPhase(2), 700);
+        setTimeout(() => setPhase(3), 1700);
+        setTimeout(() => setPhase(4), 2900);
+        setTimeout(() => setPhase(5), 4100);
+      }
+    }, 35);
+    return () => clearInterval(typer);
   }, []);
 
   return (
@@ -64,8 +72,8 @@ export default function LandingPage() {
               className="text-text-2 mb-9"
               style={{ fontSize: 17, lineHeight: 1.55, maxWidth: 560 }}
             >
-              실제 업무 시나리오 기반 태스크를 Claude·GPT와 함께 풀고, 4단계 채점 파이프라인이 당신의
-              AI 활용 능력을 정량화합니다.
+              실제 업무 시나리오 기반 태스크를 Claude·GPT와 함께 풀고, 4단계 채점 파이프라인이
+              당신의 AI 활용 능력을 정량화합니다.
             </p>
             <div className="flex gap-2.5" style={{ marginBottom: 60 }}>
               <Link
@@ -96,45 +104,173 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Terminal demo */}
+            {/* Inline chat demo — prompt → AI reply → live scoring */}
             <div
               className="bg-bg-1 border border-line rounded-[10px] overflow-hidden"
               style={{ maxWidth: 720 }}
             >
+              {/* Session header */}
               <div
                 className="flex items-center gap-2.5 border-b border-line bg-bg-2"
-                style={{ padding: '8px 14px' }}
+                style={{ padding: '9px 14px' }}
               >
-                <div className="flex gap-1.5">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="w-2 h-2 rounded-full" style={{ background: '#3b3f47' }} />
-                  ))}
+                <div className="inline-flex items-center gap-1.5">
+                  <span
+                    className="inline-block w-[7px] h-[7px] rounded-full bg-acc"
+                    style={{ boxShadow: '0 0 0 3px oklch(0.86 0.2 130 / 0.25)' }}
+                  />
+                  <span
+                    className="font-mono text-text-3"
+                    style={{ fontSize: 10.5, letterSpacing: '0.04em' }}
+                  >
+                    LIVE SESSION
+                  </span>
                 </div>
-                <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                  ~/promptquest · session.live
+                <div className="bg-line-2" style={{ width: 1, height: 12 }} />
+                <span className="font-mono text-text-2" style={{ fontSize: 11 }}>
+                  regex-email-001
                 </span>
                 <span
-                  className="ml-auto inline-block w-[7px] h-[7px] rounded-full bg-acc"
-                  style={{ boxShadow: '0 0 0 3px oklch(0.86 0.2 130 / 0.25)' }}
-                />
+                  className="ml-auto font-mono text-diff-easy"
+                  style={{
+                    fontSize: 10,
+                    padding: '2px 7px',
+                    borderRadius: 3,
+                    background: 'oklch(0.82 0.14 145 / 0.12)',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  EASY
+                </span>
               </div>
-              <div className="font-mono" style={{ padding: 18, fontSize: 12.5, lineHeight: 1.7 }}>
-                <div className="text-text-3"># Task: regex-email-001 / Easy</div>
-                <div className="text-text-1">
-                  {typed}
-                  <span className="caret" />
+
+              {/* User message */}
+              <div className="flex gap-2.5" style={{ padding: '14px 16px' }}>
+                <div
+                  className="bg-bg-3 text-text-2 grid place-items-center font-mono font-semibold flex-shrink-0"
+                  style={{ width: 22, height: 22, borderRadius: 4, fontSize: 10 }}
+                >
+                  You
                 </div>
-                <div className="text-text-3 mt-3.5">
-                  <span className="text-acc">✓</span> Validator passed (3/3 reqs)
-                </div>
-                <div className="text-text-3">
-                  <span className="text-acc">✓</span> Judge ensemble x3 (σ=2.1)
-                </div>
-                <div className="text-text-1 mt-2">
-                  → score <span className="text-acc text-lg font-semibold">87</span>
-                  <span className="text-text-3"> · top 12% · clarity 9.0 · context 8.3</span>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="font-mono text-text-3 mb-1"
+                    style={{ fontSize: 9.5, letterSpacing: '0.04em' }}
+                  >
+                    PROMPT · {Math.max(1, Math.ceil(typed.length / 3.5))} tok
+                  </div>
+                  <div className="text-text-1" style={{ fontSize: 13, lineHeight: 1.55 }}>
+                    {typed}
+                    {phase === 0 && <span className="caret" />}
+                  </div>
                 </div>
               </div>
+
+              {/* AI message */}
+              {phase >= 2 && (
+                <div
+                  className="flex gap-2.5 bg-bg-1 border-t border-line"
+                  style={{ padding: '14px 16px' }}
+                >
+                  <div
+                    className="bg-acc-dim text-acc grid place-items-center font-mono font-semibold flex-shrink-0"
+                    style={{ width: 22, height: 22, borderRadius: 4, fontSize: 10 }}
+                  >
+                    AI
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className="font-mono text-text-3 mb-1"
+                      style={{ fontSize: 9.5, letterSpacing: '0.04em' }}
+                    >
+                      claude-sonnet-4-5{phase === 2 && ' · thinking…'}
+                    </div>
+                    {phase === 2 ? (
+                      <div className="flex gap-1" style={{ padding: '6px 0' }}>
+                        {[0, 1, 2].map((i) => (
+                          <div
+                            key={i}
+                            className="bg-text-3 rounded-full"
+                            style={{
+                              width: 6,
+                              height: 6,
+                              animation: `bounce-dot 1.2s ${i * 0.15}s ease-in-out infinite`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="text-text-2 mb-2"
+                          style={{ fontSize: 12.5, lineHeight: 1.55 }}
+                        >
+                          ReDoS 안전성을 위해 character class 중첩을 피한 패턴입니다:
+                        </div>
+                        <div
+                          className="font-mono bg-bg-0 border border-line-2 text-acc overflow-x-auto whitespace-nowrap"
+                          style={{ fontSize: 11.5, padding: '8px 10px', borderRadius: 4 }}
+                        >
+                          {String.raw`/\b[\w.+\-]+@[\w.-]+\.[A-Za-z]{2,}\b/g`}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Scoring */}
+              {phase >= 4 && (
+                <div
+                  className="border-t border-line bg-bg-0 animate-fade-in"
+                  style={{ padding: '12px 16px' }}
+                >
+                  <div
+                    className="font-mono text-text-3 mb-2"
+                    style={{ fontSize: 9.5, letterSpacing: '0.06em' }}
+                  >
+                    ─── EVALUATION
+                  </div>
+                  <div
+                    className="grid items-center"
+                    style={{ gridTemplateColumns: '1fr 1fr 1fr auto', gap: 12 }}
+                  >
+                    <div className="font-mono text-text-2" style={{ fontSize: 11 }}>
+                      <span className="text-acc">✓</span> Validator{' '}
+                      <span className="text-text-3">3/3</span>
+                    </div>
+                    <div className="font-mono text-text-2" style={{ fontSize: 11 }}>
+                      <span className="text-acc">✓</span> Quant{' '}
+                      <span className="text-text-3">−18%tok</span>
+                    </div>
+                    <div className="font-mono text-text-2" style={{ fontSize: 11 }}>
+                      <span className={phase >= 5 ? 'text-acc' : 'text-warn'}>
+                        {phase >= 5 ? '✓' : '◌'}
+                      </span>{' '}
+                      Judge ×3
+                      {phase >= 5 && (
+                        <>
+                          {' '}
+                          <span className="text-text-3">σ=2.1</span>
+                        </>
+                      )}
+                    </div>
+                    {phase >= 5 && (
+                      <div className="flex items-baseline gap-1 animate-fade-in">
+                        <span
+                          className="font-mono font-semibold text-acc"
+                          style={{ fontSize: 22, letterSpacing: '-0.02em' }}
+                        >
+                          87
+                        </span>
+                        <span className="font-mono text-text-3" style={{ fontSize: 10 }}>
+                          · top 12%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
