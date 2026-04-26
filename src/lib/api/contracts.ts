@@ -45,6 +45,40 @@ export interface ListTasksResponse {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// GET /api/leaderboard
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface PublicAttemptItem {
+  session_id: string;
+  user: {
+    username: string;
+    display_name: string | null;
+  };
+  task: {
+    id: string;
+    slug: string;
+    title: string;
+    category: string;
+    difficulty: Difficulty;
+  };
+  score: number;
+  percentile: number | null;
+  prompts: string[];
+  started_at: string;
+  evaluated_at: string | null;
+  attempt_count: number;
+  message_count: number;
+  total_tokens: number;
+}
+
+export interface PublicAttemptsResponse {
+  attempts: PublicAttemptItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // GET /api/tasks/[slug]
 // ──────────────────────────────────────────────────────────────────────────
 

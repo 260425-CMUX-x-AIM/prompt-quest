@@ -6,9 +6,16 @@ import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
 import { createClient } from '@/lib/supabase/client';
 
-const NAV_ITEMS = [
+type NavItem = {
+  id: string;
+  label: string;
+  href: string;
+  soon?: boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { id: 'tasks', label: 'Tasks', href: '/tasks' },
-  { id: 'leaderboard', label: 'Leaderboard', href: '#', soon: true },
+  { id: 'leaderboard', label: 'Leaderboard', href: '/leaderboard' },
   { id: 'me', label: 'My', href: '/me' },
 ];
 
@@ -55,6 +62,7 @@ export default function NavBar() {
 
   const getActive = () => {
     if (pathname.startsWith('/tasks') || pathname.startsWith('/challenge')) return 'tasks';
+    if (pathname.startsWith('/leaderboard')) return 'leaderboard';
     if (pathname.startsWith('/my-dojo') || pathname.startsWith('/me')) return 'me';
     return '';
   };

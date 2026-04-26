@@ -1,0 +1,69 @@
+metadata:
+  id: component-pagination-001
+  title: 'React 페이지네이션 컴포넌트 구현'
+  category: component
+  difficulty: medium
+  estimated_minutes: 15
+  version: 1
+  author: '운영자'
+  created_at: '2026-04-25'
+
+context:
+  background: |
+    테이블 하단에 들어갈 페이지네이션 UI를 구현해야 합니다.
+  scenario: |
+    접근성, 엣지 케이스, ellipsis 규칙까지 챙겨야 합니다.
+    현재 페이지, 처음/마지막 페이지, 인접 페이지를 일관되게 보여줘야 합니다.
+
+requirements:
+  - id: req-1
+    description: '현재 페이지, 처음/마지막 페이지, 인접 페이지를 명확히 노출'
+    weight: 0.35
+  - id: req-2
+    description: '페이지 수가 많을 때 ellipsis 표시'
+    weight: 0.2
+  - id: req-3
+    description: '이전/다음 버튼 비활성화 처리'
+    weight: 0.15
+  - id: req-4
+    description: '키보드 접근성과 aria-current 지원'
+    weight: 0.2
+  - id: req-5
+    description: 'onPageChange는 유효한 페이지에만 호출'
+    weight: 0.1
+
+artifact_format:
+  type: component
+  language: typescript
+  stub: |
+    export function Pagination({ page, totalPages, onPageChange }) {
+      // TODO
+    }
+
+test_cases:
+  - id: tc-positive-1
+    input: 'page=1, totalPages=5'
+    expected_output: '1 2 3 4 5, 이전 버튼 비활성화'
+    type: positive
+  - id: tc-positive-2
+    input: 'page=5, totalPages=10'
+    expected_output: '1 ... 4 5 6 ... 10'
+    type: positive
+  - id: tc-edge-1
+    input: 'page=10, totalPages=10'
+    expected_output: '다음 버튼 비활성화, 마지막 페이지 활성'
+    type: edge_case
+  - id: tc-edge-2
+    input: 'page=1, totalPages=1'
+    expected_output: '숫자 버튼 1개만 표시'
+    type: edge_case
+
+constraints:
+  max_attempts: 6
+  time_limit_seconds: 1200
+
+baseline:
+  median_total_tokens: 1700
+  median_attempts: 3
+  median_time_seconds: 720
+  computed_from_sessions: 0

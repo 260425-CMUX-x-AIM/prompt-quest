@@ -1,0 +1,69 @@
+metadata:
+  id: algo-sort-001
+  title: '객체 배열 다중 키 정렬'
+  category: algo
+  difficulty: medium
+  estimated_minutes: 12
+  version: 1
+  author: '운영자'
+  created_at: '2026-04-25'
+
+context:
+  background: |
+    운영 대시보드 이슈 목록을 우선순위, 상태, 생성일, 담당자 유무로 정렬해야 합니다.
+  scenario: |
+    안정 정렬과 불변성이 중요합니다.
+    priority, status, createdAt, assignee 규칙을 모두 만족하는 정렬 함수를 구현해야 합니다.
+
+requirements:
+  - id: req-1
+    description: 'priority: P0 > P1 > P2'
+    weight: 0.2
+  - id: req-2
+    description: 'status: blocked > in_progress > todo > done'
+    weight: 0.2
+  - id: req-3
+    description: 'createdAt 최신순'
+    weight: 0.2
+  - id: req-4
+    description: '담당자 있는 항목 우선'
+    weight: 0.15
+  - id: req-5
+    description: '동일 조건에서는 입력 순서 유지'
+    weight: 0.25
+
+artifact_format:
+  type: function
+  language: typescript
+  stub: |
+    export function sortTickets(items) {
+      // TODO
+    }
+
+test_cases:
+  - id: tc-positive-1
+    input: 'P0/todo, P1/blocked, P0/blocked'
+    expected_output: 'P0/blocked가 최상단'
+    type: positive
+  - id: tc-positive-2
+    input: '같은 priority/status, 날짜만 다름'
+    expected_output: '최신 createdAt 우선'
+    type: positive
+  - id: tc-edge-1
+    input: '같은 모든 조건, assignee만 다름'
+    expected_output: '담당자 있는 항목 우선'
+    type: edge_case
+  - id: tc-edge-2
+    input: '완전히 동일한 두 항목'
+    expected_output: '입력 순서 유지'
+    type: edge_case
+
+constraints:
+  max_attempts: 6
+  time_limit_seconds: 900
+
+baseline:
+  median_total_tokens: 1500
+  median_attempts: 3
+  median_time_seconds: 600
+  computed_from_sessions: 0

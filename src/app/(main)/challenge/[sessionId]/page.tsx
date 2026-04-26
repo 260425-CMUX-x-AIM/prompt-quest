@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { DiffTag } from '@/components/Tags';
+import { getClientAiConfig } from '@/lib/ai-provider.client';
 import { extractCodeBlocks } from '@/lib/challenge';
 import { getErrorMessage } from '@/lib/api/errors';
 import type {
@@ -16,6 +17,11 @@ import type {
 } from '@/lib/api/contracts';
 import type { Artifact, CodeBlock, Message } from '@/lib/types/session';
 
+type ChallengeChatMessage = Pick<
+  Message,
+  'id' | 'role' | 'content' | 'input_tokens' | 'output_tokens' | 'extracted_code_blocks'
+>;
+
 function elapsedString(startIso: string, now: number): string {
   const sec = Math.max(0, Math.floor((now - new Date(startIso).getTime()) / 1000));
   const m = String(Math.floor(sec / 60)).padStart(2, '0');
@@ -25,9 +31,11 @@ function elapsedString(startIso: string, now: number): string {
 
 function MessageBubble({
   msg,
+  modelLabel,
   onAddToArtifact,
 }: {
-  msg: Message;
+  msg: ChallengeChatMessage;
+  modelLabel: string;
   onAddToArtifact: (block: CodeBlock) => void;
 }) {
   const isUser = msg.role === 'user';
@@ -51,11 +59,8 @@ function MessageBubble({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2.5 mb-1.5">
-          <span
-            className="font-mono text-text-3"
-            style={{ fontSize: 10, letterSpacing: '0.04em' }}
-          >
-            {isUser ? 'me' : 'claude-sonnet-4-6'}
+          <span className="font-mono text-text-3" style={{ fontSize: 10, letterSpacing: '0.04em' }}>
+            {isUser ? 'me' : modelLabel}
           </span>
           {(msg.input_tokens != null || msg.output_tokens != null) && (
             <span className="font-mono text-text-4" style={{ fontSize: 10 }}>
@@ -69,10 +74,7 @@ function MessageBubble({
         {!isUser && blocks.length > 0 && (
           <div className="mt-2.5 flex flex-col gap-2">
             {blocks.map((block) => (
-              <div
-                key={block.id}
-                className="border border-line-2 rounded-md overflow-hidden"
-              >
+              <div key={block.id} className="border border-line-2 rounded-md overflow-hidden">
                 <div
                   className="flex items-center justify-between border-b border-line-2 bg-bg-2"
                   style={{ padding: '6px 10px' }}
@@ -104,13 +106,43 @@ function MessageBubble({
   );
 }
 
-export default function ChallengePage({
-  params,
-}: {
-  params: Promise<{ sessionId: string }>;
-}) {
+function ThinkingBubble({ modelLabel }: { modelLabel: string }) {
+  return (
+    <div
+      className="flex gap-3 border-b border-line"
+      style={{ padding: '14px 18px', background: 'var(--color-bg-1)' }}
+    >
+      <div
+        className="grid place-items-center rounded shrink-0 font-mono font-semibold"
+        style={{
+          width: 22,
+          height: 22,
+          background: 'var(--color-acc-dim)',
+          color: 'var(--color-acc)',
+          fontSize: 10,
+        }}
+      >
+        AI
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <span className="font-mono text-text-3" style={{ fontSize: 10, letterSpacing: '0.04em' }}>
+            {modelLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-text-3" style={{ fontSize: 13 }}>
+          <span className="inline-block h-2 w-2 rounded-full bg-acc animate-pulse" />
+          답변을 생성하는 중…
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ChallengePage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const router = useRouter();
+  const aiConfig = getClientAiConfig();
 
   const [data, setData] = useState<GetSessionResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,6 +152,9 @@ export default function ChallengePage({
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [optimisticUserMessage, setOptimisticUserMessage] = useState<ChallengeChatMessage | null>(
+    null,
+  );
 
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
@@ -181,11 +216,14 @@ export default function ChallengePage({
   // chat 자동 스크롤
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [data?.messages.length]);
+  }, [data?.messages.length, optimisticUserMessage, sending]);
 
   if (loading) {
     return (
-      <div className="grid place-items-center h-screen bg-bg-0 text-text-3" style={{ fontSize: 12 }}>
+      <div
+        className="grid place-items-center h-screen bg-bg-0 text-text-3"
+        style={{ fontSize: 12 }}
+      >
         세션을 불러오는 중…
       </div>
     );
@@ -203,8 +241,19 @@ export default function ChallengePage({
   const session = data.session;
   const task = data.task;
   const messages = data.messages;
+  const starterMessage: ChallengeChatMessage = {
+    id: 'starter-assistant-message',
+    role: 'assistant',
+    content: '무엇을 도와드릴까요?',
+    input_tokens: null,
+    output_tokens: null,
+    extracted_code_blocks: null,
+  };
+  const visibleMessages: ChallengeChatMessage[] = [
+    ...(messages.length === 0 ? [starterMessage] : messages),
+    ...(optimisticUserMessage ? [optimisticUserMessage] : []),
+  ];
   const activeArtifact = artifacts.find((a) => a.id === activeArtifactId) ?? null;
-  const totalTokens = session.total_input_tokens + session.total_output_tokens;
   const elapsed = elapsedString(session.started_at, now);
   const attempts = `${session.attempt_count}/${task.constraints.max_attempts}`;
 
@@ -214,6 +263,14 @@ export default function ChallengePage({
     setSending(true);
     setSendError(null);
     const content = input;
+    setOptimisticUserMessage({
+      id: `optimistic-user-${Date.now()}`,
+      role: 'user',
+      content,
+      input_tokens: null,
+      output_tokens: null,
+      extracted_code_blocks: null,
+    });
     setInput('');
     try {
       const res = await fetch(`/api/sessions/${sessionId}/messages`, {
@@ -225,9 +282,11 @@ export default function ChallengePage({
         const err = (await res.json().catch(() => null)) as ApiError | null;
         setSendError(getErrorMessage(err?.error?.code));
         setInput(content);
+        setOptimisticUserMessage(null);
         return;
       }
       const json = (await res.json()) as SendMessageResponse;
+      setOptimisticUserMessage(null);
       setData((prev) =>
         prev
           ? {
@@ -247,6 +306,7 @@ export default function ChallengePage({
     } catch {
       setSendError('메시지 전송에 실패했습니다.');
       setInput(content);
+      setOptimisticUserMessage(null);
     } finally {
       setSending(false);
     }
@@ -278,22 +338,17 @@ export default function ChallengePage({
     if (!activeArtifact || !artifactDirty || savingArtifact) return;
     setSavingArtifact(true);
     try {
-      const res = await fetch(
-        `/api/sessions/${sessionId}/artifacts/${activeArtifact.id}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: artifactDraft,
-            source: 'user_edited',
-          }),
-        },
-      );
+      const res = await fetch(`/api/sessions/${sessionId}/artifacts/${activeArtifact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: artifactDraft,
+          source: 'user_edited',
+        }),
+      });
       if (!res.ok) return;
       const json = (await res.json()) as UpdateArtifactResponse;
-      setArtifacts((prev) =>
-        prev.map((a) => (a.id === json.artifact.id ? json.artifact : a)),
-      );
+      setArtifacts((prev) => prev.map((a) => (a.id === json.artifact.id ? json.artifact : a)));
       setArtifactDirty(false);
     } finally {
       setSavingArtifact(false);
@@ -351,7 +406,11 @@ export default function ChallengePage({
               ⏱ <span className="text-text-1">{elapsed}</span>
             </span>
             <span className="text-text-3">
-              ⎔ <span className="text-text-1">{totalTokens.toLocaleString()}</span> tok
+              in <span className="text-text-1">{session.total_input_tokens.toLocaleString()}</span>
+            </span>
+            <span className="text-text-3">
+              out{' '}
+              <span className="text-text-1">{session.total_output_tokens.toLocaleString()}</span>
             </span>
             <span className="text-text-3">
               ↻ <span className="text-text-1">{attempts}</span>
@@ -414,15 +473,15 @@ export default function ChallengePage({
         {/* 중: 대화 */}
         <div className="flex flex-col flex-1 overflow-hidden border-r border-line">
           <div ref={chatRef} className="flex-1 overflow-y-auto custom-scroll">
-            {messages.length === 0 ? (
-              <div className="text-text-3 p-5" style={{ fontSize: 12 }}>
-                AI 에게 첫 프롬프트를 보내 결과물 작성을 시작해 보세요.
-              </div>
-            ) : (
-              messages.map((m) => (
-                <MessageBubble key={m.id} msg={m} onAddToArtifact={addToArtifact} />
-              ))
-            )}
+            {visibleMessages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                msg={m}
+                modelLabel={aiConfig.modelLabel}
+                onAddToArtifact={addToArtifact}
+              />
+            ))}
+            {sending && <ThinkingBubble modelLabel={aiConfig.modelLabel} />}
           </div>
           <form
             onSubmit={sendMessage}
@@ -466,10 +525,7 @@ export default function ChallengePage({
         </div>
 
         {/* 우: artifact */}
-        <div
-          className="shrink-0 flex flex-col overflow-hidden"
-          style={{ width: 380 }}
-        >
+        <div className="shrink-0 flex flex-col overflow-hidden" style={{ width: 380 }}>
           <div
             className="border-b border-line flex items-center justify-between"
             style={{ padding: '10px 14px' }}
@@ -494,8 +550,8 @@ export default function ChallengePage({
           </div>
           {!activeArtifact ? (
             <div className="text-text-3 p-5" style={{ fontSize: 12, lineHeight: 1.5 }}>
-              AI 응답에서 코드 블록의 <span className="font-mono">+ 결과물에 추가</span> 버튼을
-              눌러 결과물을 만들어 보세요.
+              AI 응답에서 코드 블록의 <span className="font-mono">+ 결과물에 추가</span> 버튼을 눌러
+              결과물을 만들어 보세요.
             </div>
           ) : (
             <textarea
@@ -537,13 +593,9 @@ export default function ChallengePage({
                       fontSize: 11,
                       padding: '2px 7px',
                       borderColor:
-                        a.id === activeArtifactId
-                          ? 'var(--color-acc)'
-                          : 'var(--color-line-2)',
+                        a.id === activeArtifactId ? 'var(--color-acc)' : 'var(--color-line-2)',
                       background:
-                        a.id === activeArtifactId
-                          ? 'var(--color-acc-dim)'
-                          : 'transparent',
+                        a.id === activeArtifactId ? 'var(--color-acc-dim)' : 'transparent',
                       color: a.id === activeArtifactId ? 'var(--color-acc)' : 'var(--color-text-2)',
                     }}
                   >

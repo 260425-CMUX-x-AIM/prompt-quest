@@ -29,3 +29,12 @@
 
 - [미션 문제 예시 16종](./mission-examples.md)
 - [심사표 평가 및 보완사항](./review-feedback.md)
+
+### Quest 문제 설계안
+
+- [Quest 카탈로그 개요](./quest/README.md)
+- [초급 문제 7종](./quest/easy.md)
+- [중급 문제 7종](./quest/medium.md)
+- [고급 문제 7종](./quest/hard.md)
+- [직군 확장 Quest 12종](./quest/multidomain.md)
+- [흥미 요소 / 보스 퀘스트 / 이벤트 모드](./quest/engagement.md)
