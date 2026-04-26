@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import NavBar from '@/components/NavBar';
 import Pagination from '@/components/Pagination';
 import { CategoryTag, DiffTag } from '@/components/Tags';
@@ -53,8 +54,13 @@ function AttemptCard({ attempt, rank }: { attempt: PublicAttemptItem; rank: numb
             {attempt.task.title}
           </h2>
           <div className="font-mono text-text-3" style={{ fontSize: 11 }}>
-            @{displayName} · {attempt.message_count} messages ·{' '}
-            {attempt.total_tokens.toLocaleString()} tokens
+            <Link
+              href={`/user/${attempt.user.username}`}
+              className="hover:text-text-2 underline underline-offset-2"
+            >
+              @{displayName}
+            </Link>{' '}
+            · {attempt.message_count} messages · {attempt.total_tokens.toLocaleString()} tokens
           </div>
         </div>
 

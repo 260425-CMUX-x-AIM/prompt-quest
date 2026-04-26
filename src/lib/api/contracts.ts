@@ -12,6 +12,7 @@ import type { AggregatedResult, EvaluationStage } from '@/lib/types/evaluation';
 export type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
+  | 'NOT_FOUND'
   | 'INVALID_INPUT'
   | 'SESSION_INVALID'
   | 'MESSAGE_LIMIT_EXCEEDED'
@@ -224,6 +225,21 @@ export interface MeSessionsItem extends Session {
 }
 
 export interface MeSessionsResponse {
+  sessions: MeSessionsItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface PublicProfile {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface UserSessionsResponse {
+  profile: PublicProfile;
   sessions: MeSessionsItem[];
   total: number;
   page: number;
