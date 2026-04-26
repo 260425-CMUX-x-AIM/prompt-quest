@@ -121,7 +121,7 @@ export interface GetSessionResponse {
   artifacts: Artifact[];
   task: Pick<
     TaskDefinition,
-    'metadata' | 'context' | 'requirements' | 'artifact_format' | 'constraints'
+    'metadata' | 'context' | 'requirements' | 'artifact_format' | 'test_cases' | 'constraints'
   >;
 }
 

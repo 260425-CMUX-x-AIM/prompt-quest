@@ -65,6 +65,7 @@ export function aggregate({
       judge_runs_succeeded: judge.successful_runs,
       judge_max_stddev: judgeMaxStddev,
       is_low_confidence: isLowConfidence,
+      test_results: validator.test_results,
     },
   };
 }

@@ -249,6 +249,7 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
 
   const { pattern, flags } = regexParts;
   const failedRequirements: ValidatorResult['failed_requirements'] = [];
+  const testResults: NonNullable<ValidatorResult['test_results']> = [];
   try {
     const regex = new RegExp(pattern, flags);
     for (const testCase of taskDefinition.test_cases) {
@@ -263,26 +264,40 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
         : Array.isArray(testCase.expected_output)
           ? testCase.expected_output.filter((value): value is string => typeof value === 'string')
           : [];
-      if (JSON.stringify(matches) !== JSON.stringify(expected)) {
+      const passed = JSON.stringify(matches) === JSON.stringify(expected);
+      testResults.push({
+        id: testCase.id,
+        type: testCase.type,
+        passed,
+        input: testCase.input,
+        expected,
+        actual: matches,
+        reason: passed ? undefined : '기대 매칭과 실제 매칭이 다릅니다.',
+      });
+      if (!passed) {
         failedRequirements.push({
           id: 'req-1',
           reason: `${testCase.id}에서 기대 매칭과 실제 매칭이 다릅니다. expected=${JSON.stringify(expected)}, actual=${JSON.stringify(matches)}`,
         });
-        break;
       }
     }
   } catch (error) {
+    const reason = error instanceof Error ? error.message : '정규식을 해석하지 못했습니다.';
     failedRequirements.push({
       id: 'req-1',
-      reason: error instanceof Error ? error.message : '정규식을 해석하지 못했습니다.',
+      reason,
     });
-  }
-
-  if (!/\\\./.test(pattern) && !/\./.test(pattern)) {
-    failedRequirements.push({
-      id: 'req-2',
-      reason: '도메인 구분 점(.) 제약을 찾지 못했습니다.',
-    });
+    for (const testCase of taskDefinition.test_cases) {
+      testResults.push({
+        id: testCase.id,
+        type: testCase.type,
+        passed: false,
+        input: testCase.input,
+        expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+        actual: null,
+        reason,
+      });
+    }
   }
 
   for (const forbiddenPattern of taskDefinition.constraints.forbidden_patterns ?? []) {
@@ -301,6 +316,7 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
       .map((item) => item.id)
       .filter((id) => !failedIds.has(id)),
     failed_requirements: failedRequirements,
+    test_results: testResults,
     overall_reason:
       failedRequirements.length === 0
         ? '정적 regex 테스트를 통과했습니다.'
@@ -342,6 +358,15 @@ function failAllRequirements(taskDefinition: TaskDefinition, reason: string): Va
     passed_requirements: [],
     failed_requirements: taskDefinition.requirements.map((requirement) => ({
       id: requirement.id,
+      reason,
+    })),
+    test_results: taskDefinition.test_cases.map((testCase) => ({
+      id: testCase.id,
+      type: testCase.type,
+      passed: false,
+      input: testCase.input,
+      expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+      actual: null,
       reason,
     })),
     overall_reason: reason,
@@ -501,6 +526,7 @@ function aggregate({
         judge.successful_runs < 2 ||
         judgeMaxStddev > 2 ||
         quantitative.efficiency.baseline_source === 'default',
+      test_results: validator.test_results,
     },
   };
 }

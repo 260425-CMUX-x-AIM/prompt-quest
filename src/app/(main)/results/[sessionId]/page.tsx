@@ -49,6 +49,12 @@ function pctColor(pct: number): string {
   return 'var(--color-err)';
 }
 
+function formatCaseValue(value: unknown): string {
+  if (value == null) return '—';
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value, null, 2);
+}
+
 export default function ResultsPage({
   params,
 }: {
@@ -127,6 +133,15 @@ export default function ResultsPage({
   const taskMeta = session.task.metadata;
   const submittedArtifact =
     session.artifacts.find((artifact) => artifact.is_final) ?? session.artifacts.at(-1) ?? null;
+  const testResultsById = new Map(
+    (evaluation?.meta.test_results ?? []).map((result) => [result.id, result]),
+  );
+  const testResultSummary = {
+    pass: Array.from(testResultsById.values()).filter((result) => result.passed).length,
+    fail: Array.from(testResultsById.values()).filter((result) => !result.passed).length,
+    stored: testResultsById.size,
+    total: session.task.test_cases.length,
+  };
   const isEvaluating = status === 'evaluating' && !evaluation;
 
   return (
@@ -246,6 +261,137 @@ export default function ResultsPage({
                 >
                   {submittedArtifact.content}
                 </pre>
+              </div>
+            </div>
+          )}
+
+          {session.task.test_cases.length > 0 && (
+            <div className="mb-7">
+              <div
+                className="font-mono text-text-3 mb-3.5"
+                style={{ fontSize: 11, letterSpacing: '0.08em' }}
+              >
+                ─── TEST CASES · {testResultSummary.stored > 0
+                  ? `${testResultSummary.pass} PASS / ${testResultSummary.fail} FAIL`
+                  : `${testResultSummary.total} CASES`}
+              </div>
+              <div className="grid gap-3">
+                {session.task.test_cases.map((testCase) => {
+                  const testResult = testResultsById.get(testCase.id);
+                  const statusColor =
+                    testResult == null
+                      ? 'var(--color-text-4)'
+                      : testResult.passed
+                        ? 'var(--color-acc)'
+                        : 'var(--color-err)';
+
+                  return (
+                    <div
+                      key={testCase.id}
+                      className="bg-bg-1 border border-line rounded-[10px] overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-text-2" style={{ fontSize: 11 }}>
+                            {testCase.id}
+                          </span>
+                          <span
+                            className="font-mono uppercase text-text-4 border border-line-2 rounded"
+                            style={{ fontSize: 9.5, padding: '1px 6px' }}
+                          >
+                            {testCase.type}
+                          </span>
+                          <span
+                            className="font-mono uppercase border rounded"
+                            style={{
+                              fontSize: 9.5,
+                              padding: '1px 6px',
+                              color: statusColor,
+                              borderColor: statusColor,
+                            }}
+                          >
+                            {testResult == null ? 'not stored' : testResult.passed ? 'pass' : 'fail'}
+                          </span>
+                        </div>
+                        {testCase.description && (
+                          <div className="text-text-3" style={{ fontSize: 11 }}>
+                            {testCase.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid gap-0 md:grid-cols-3">
+                        <div className="border-b border-line p-4 md:border-b-0 md:border-r">
+                          <div
+                            className="font-mono text-text-4 mb-2"
+                            style={{ fontSize: 10, letterSpacing: '0.06em' }}
+                          >
+                            INPUT
+                          </div>
+                          <pre
+                            className="custom-scroll overflow-x-auto text-text-2"
+                            style={{
+                              margin: 0,
+                              maxHeight: 150,
+                              fontSize: 12,
+                              lineHeight: 1.6,
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {formatCaseValue(testCase.input)}
+                          </pre>
+                        </div>
+                        <div className="border-b border-line p-4 md:border-b-0 md:border-r">
+                          <div
+                            className="font-mono text-text-4 mb-2"
+                            style={{ fontSize: 10, letterSpacing: '0.06em' }}
+                          >
+                            EXPECTED
+                          </div>
+                          <pre
+                            className="custom-scroll overflow-x-auto text-text-2"
+                            style={{
+                              margin: 0,
+                              maxHeight: 150,
+                              fontSize: 12,
+                              lineHeight: 1.6,
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {formatCaseValue(testResult?.expected ?? testCase.expected_matches ?? testCase.expected_output)}
+                          </pre>
+                        </div>
+                        <div className="p-4">
+                          <div
+                            className="font-mono text-text-4 mb-2"
+                            style={{ fontSize: 10, letterSpacing: '0.06em' }}
+                          >
+                            ACTUAL
+                          </div>
+                          <pre
+                            className="custom-scroll overflow-x-auto text-text-2"
+                            style={{
+                              margin: 0,
+                              maxHeight: 150,
+                              fontSize: 12,
+                              lineHeight: 1.6,
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {formatCaseValue(testResult?.actual)}
+                          </pre>
+                          {testResult?.reason && (
+                            <div className="mt-2 text-err" style={{ fontSize: 11.5 }}>
+                              {testResult.reason}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

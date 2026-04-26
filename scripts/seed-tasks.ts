@@ -19,6 +19,7 @@ const CATEGORY_LABELS: Record<
   analysis: { label_ko: '분석', label_en: 'Analysis', display_order: 10 },
   workflow: { label_ko: '워크플로우', label_en: 'Workflow', display_order: 11 },
   strategy: { label_ko: '전략', label_en: 'Strategy', display_order: 12 },
+  sql: { label_ko: 'SQL', label_en: 'SQL', display_order: 13 },
 };
 
 function assertEnv(name: string): string {

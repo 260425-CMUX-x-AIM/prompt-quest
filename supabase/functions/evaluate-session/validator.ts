@@ -115,6 +115,15 @@ function heuristicValidateArtifact(
         id: requirement.id,
         reason: '결과물이 비어 있거나 placeholder 상태입니다.',
       })),
+      test_results: taskDefinition.test_cases.map((testCase) => ({
+        id: testCase.id,
+        type: testCase.type,
+        passed: false,
+        input: testCase.input,
+        expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+        actual: null,
+        reason: '결과물이 비어 있거나 placeholder 상태입니다.',
+      })),
       overall_reason: '결과물이 비어 있거나 placeholder 상태입니다.',
     };
   }
@@ -154,12 +163,22 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
         id: requirement.id,
         reason: '정규식 리터럴을 찾지 못했습니다.',
       })),
+      test_results: taskDefinition.test_cases.map((testCase) => ({
+        id: testCase.id,
+        type: testCase.type,
+        passed: false,
+        input: testCase.input,
+        expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+        actual: null,
+        reason: '정규식 리터럴을 찾지 못했습니다.',
+      })),
       overall_reason: '정규식 리터럴을 찾지 못했습니다.',
     };
   }
 
   const { pattern, flags } = regexParts;
   const failed_requirements: ValidatorResult['failed_requirements'] = [];
+  const test_results: NonNullable<ValidatorResult['test_results']> = [];
 
   try {
     const regex = new RegExp(pattern, flags);
@@ -176,26 +195,40 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
           ? testCase.expected_output.filter((value): value is string => typeof value === 'string')
           : [];
 
-      if (JSON.stringify(matches) !== JSON.stringify(expected)) {
+      const passed = JSON.stringify(matches) === JSON.stringify(expected);
+      test_results.push({
+        id: testCase.id,
+        type: testCase.type,
+        passed,
+        input: testCase.input,
+        expected,
+        actual: matches,
+        reason: passed ? undefined : '기대 매칭과 실제 매칭이 다릅니다.',
+      });
+      if (!passed) {
         failed_requirements.push({
           id: 'req-1',
-          reason: `${testCase.id}에서 기대 매칭과 실제 매칭이 다릅니다.`,
+          reason: `${testCase.id}에서 기대 매칭과 실제 매칭이 다릅니다. expected=${JSON.stringify(expected)}, actual=${JSON.stringify(matches)}`,
         });
-        break;
       }
     }
   } catch (error) {
+    const reason = error instanceof Error ? error.message : '정규식을 해석하지 못했습니다.';
     failed_requirements.push({
       id: 'req-1',
-      reason: error instanceof Error ? error.message : '정규식을 해석하지 못했습니다.',
+      reason,
     });
-  }
-
-  if (!/\\\./.test(pattern) && !/\./.test(pattern)) {
-    failed_requirements.push({
-      id: 'req-2',
-      reason: '도메인 구분 점(.) 제약을 찾지 못했습니다.',
-    });
+    for (const testCase of taskDefinition.test_cases) {
+      test_results.push({
+        id: testCase.id,
+        type: testCase.type,
+        passed: false,
+        input: testCase.input,
+        expected: testCase.expected_matches ?? testCase.expected_output ?? null,
+        actual: null,
+        reason,
+      });
+    }
   }
 
   for (const forbiddenPattern of taskDefinition.constraints.forbidden_patterns ?? []) {
@@ -214,6 +247,7 @@ function validateRegexArtifact(taskDefinition: TaskDefinition, artifact: string)
       .map((item) => item.id)
       .filter((id) => !failedIds.has(id)),
     failed_requirements,
+    test_results,
     overall_reason:
       failed_requirements.length === 0
         ? 'OPENAI_API_KEY가 없어 정적 regex 검증으로 통과 처리했습니다.'
