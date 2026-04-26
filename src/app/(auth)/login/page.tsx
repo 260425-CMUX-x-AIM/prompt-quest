@@ -48,13 +48,26 @@ export default function LoginPage() {
     if (code.length !== 6 || loading) return;
     setLoading(true);
     setError(null);
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+
+    // Supabase 의 OTP 토큰 type 은 발송 시점에 결정됨:
+    // - 신규 가입 (Confirm Signup 템플릿) → 'signup'
+    // - 재로그인 (Magic Link 템플릿) → 'email'
+    // 클라이언트에서 둘을 구분할 수 없으므로 'email' 먼저 시도, 실패 시 'signup' 으로 폴백.
+    let result = await supabase.auth.verifyOtp({
       email,
       token: code,
       type: 'email',
     });
+    if (result.error) {
+      result = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: 'signup',
+      });
+    }
+
     setLoading(false);
-    if (verifyError) {
+    if (result.error) {
       setError('잘못된 코드이거나 만료되었습니다.');
       return;
     }
