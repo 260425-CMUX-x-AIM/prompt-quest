@@ -385,11 +385,22 @@ export default function LandingPage() {
             © 2026 promptquest · v0.1.0-beta
           </div>
           <div className="flex gap-4.5">
-            {['github', 'docs', 'pricing', 'discord'].map((x) => (
-              <span key={x} className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                {x}
-              </span>
-            ))}
+            <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+              github
+            </span>
+            <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+              docs
+            </span>
+            <Link
+              href="/pricing"
+              className="font-mono text-text-3 hover:text-text-2"
+              style={{ fontSize: 11 }}
+            >
+              pricing
+            </Link>
+            <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+              discord
+            </span>
           </div>
         </div>
       </div>

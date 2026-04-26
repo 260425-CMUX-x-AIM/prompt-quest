@@ -4,6 +4,7 @@ import type { ApiErrorCode } from '@/lib/api/contracts';
 export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
   FORBIDDEN: '이 작업에 대한 권한이 없습니다.',
+  NOT_FOUND: '요청한 대상을 찾을 수 없습니다.',
   INVALID_INPUT: '입력 형식이 올바르지 않습니다.',
   SESSION_INVALID: '세션 상태가 유효하지 않습니다. 세션을 다시 시작해 주세요.',
   MESSAGE_LIMIT_EXCEEDED: '메시지 한도(50개)에 도달했습니다. 새 세션을 시작해 주세요.',
