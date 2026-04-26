@@ -3,23 +3,27 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NavBar from '@/components/NavBar';
+import Pagination from '@/components/Pagination';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import ProgressBar from '@/components/ProgressBar';
 import { getErrorMessage } from '@/lib/api/errors';
 import type { TaskListItem, ListTasksResponse, ApiError } from '@/lib/api/contracts';
 
+const PAGE_SIZE = 12;
+
 const CATEGORIES = [
-  'regex',
-  'debug',
+  'implementation',
+  'diagnosis',
   'review',
   'component',
-  'algo',
-  'api_design',
+  'architecture',
   'test',
-  'arch',
-  'refactor',
   'security',
-  'perf',
+  'communication',
+  'creative',
+  'analysis',
+  'workflow',
+  'strategy',
 ] as const;
 
 function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
@@ -83,6 +87,7 @@ export default function TasksPage() {
   const [diff, setDiff] = useState('all');
   const [cat, setCat] = useState('all');
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +122,15 @@ export default function TasksPage() {
     if (q && !t.title.toLowerCase().includes(q.toLowerCase()) && !t.slug.includes(q)) return false;
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const difficultyCounts = {
+    all: tasks.length,
+    easy: tasks.filter((task) => task.difficulty === 'easy').length,
+    medium: tasks.filter((task) => task.difficulty === 'medium').length,
+    hard: tasks.filter((task) => task.difficulty === 'hard').length,
+  };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg-0 text-text-1">
@@ -136,15 +150,18 @@ export default function TasksPage() {
           <div className="flex flex-col gap-1 mb-6">
             {(
               [
-                ['all', 'All'],
-                ['easy', 'Easy'],
-                ['medium', 'Medium'],
-                ['hard', 'Hard'],
+                ['all', 'All', difficultyCounts.all],
+                ['easy', 'Easy', difficultyCounts.easy],
+                ['medium', 'Medium', difficultyCounts.medium],
+                ['hard', 'Hard', difficultyCounts.hard],
               ] as const
-            ).map(([k, l]) => (
+            ).map(([k, l, count]) => (
               <div
                 key={k}
-                onClick={() => setDiff(k)}
+                onClick={() => {
+                  setDiff(k);
+                  setPage(1);
+                }}
                 className="flex justify-between rounded cursor-pointer"
                 style={{
                   padding: '6px 8px',
@@ -154,6 +171,7 @@ export default function TasksPage() {
                 }}
               >
                 <span>{l}</span>
+                <span className="font-mono text-text-4">{count}</span>
               </div>
             ))}
           </div>
@@ -166,7 +184,10 @@ export default function TasksPage() {
           </div>
           <div className="flex flex-col gap-0.5">
             <div
-              onClick={() => setCat('all')}
+              onClick={() => {
+                setCat('all');
+                setPage(1);
+              }}
               className="rounded cursor-pointer"
               style={{
                 padding: '5px 8px',
@@ -180,7 +201,10 @@ export default function TasksPage() {
             {CATEGORIES.map((c) => (
               <div
                 key={c}
-                onClick={() => setCat(c)}
+                onClick={() => {
+                  setCat(c);
+                  setPage(1);
+                }}
                 className="font-mono rounded cursor-pointer"
                 style={{
                   padding: '5px 8px',
@@ -204,9 +228,7 @@ export default function TasksPage() {
                   Tasks
                 </h1>
                 <div className="text-text-3 mt-1" style={{ fontSize: 12 }}>
-                  {loading
-                    ? '불러오는 중…'
-                    : `${filtered.length} of ${tasks.length} tasks`}
+                  {loading ? '불러오는 중…' : `${filtered.length} of ${tasks.length} tasks`}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -220,7 +242,10 @@ export default function TasksPage() {
                   <input
                     placeholder="태스크 검색..."
                     value={q}
-                    onChange={(e) => setQ(e.target.value)}
+                    onChange={(e) => {
+                      setQ(e.target.value);
+                      setPage(1);
+                    }}
                     className="font-mono bg-transparent border-none outline-none text-text-1 flex-1"
                     style={{ fontSize: 12 }}
                   />
@@ -264,13 +289,20 @@ export default function TasksPage() {
             </div>
           )}
 
-          {filtered.map((t) => (
-            <TaskRow
-              key={t.slug}
-              task={t}
-              onClick={() => router.push(`/tasks/${t.slug}`)}
-            />
+          {paginated.map((t) => (
+            <TaskRow key={t.slug} task={t} onClick={() => router.push(`/tasks/${t.slug}`)} />
           ))}
+
+          {!loading && !error && filtered.length > 0 && (
+            <Pagination
+              page={currentPage}
+              total={filtered.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              itemLabel="tasks"
+              className="p-5"
+            />
+          )}
         </div>
       </div>
     </div>

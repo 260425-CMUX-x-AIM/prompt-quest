@@ -23,6 +23,13 @@ export interface Session {
   total_output_tokens: number;
 }
 
+export interface CodeBlock {
+  id: string;
+  language: string;
+  content: string;
+  line_count: number;
+}
+
 export interface Message {
   id: string;
   session_id: string;
@@ -32,13 +39,6 @@ export interface Message {
   output_tokens: number | null;
   extracted_code_blocks: { blocks: CodeBlock[] } | null;
   created_at: string;
-}
-
-export interface CodeBlock {
-  id: string;
-  language: string;
-  content: string;
-  line_count: number;
 }
 
 // DB는 3-value를 유지 (`'manual'`은 v1.5의 빈 artifact 직접 작성 진입점 보존).

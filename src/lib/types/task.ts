@@ -35,7 +35,11 @@ export interface TaskDefinition {
     [key: string]: unknown;
   };
   requirements: Requirement[];
-  artifact_format: { type: string; language: string; stub?: string };
+  artifact_format: {
+    type: string;
+    language: string;
+    stub?: string;
+  };
   test_cases: TestCase[];
   constraints: {
     max_attempts: number;

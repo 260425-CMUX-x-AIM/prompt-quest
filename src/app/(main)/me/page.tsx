@@ -3,10 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NavBar from '@/components/NavBar';
+import Pagination from '@/components/Pagination';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import { getErrorMessage } from '@/lib/api/errors';
 import type { MeSessionsResponse, MeSessionsItem, ApiError } from '@/lib/api/contracts';
 import type { SessionStatus } from '@/lib/types/session';
+
+const PAGE_SIZE = 10;
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
   in_progress: '진행 중',
@@ -41,6 +44,7 @@ function scoreColor(score: number | null) {
 
 export default function MyPage() {
   const [filter, setFilter] = useState<'all' | SessionStatus>('all');
+  const [page, setPage] = useState(1);
   const [sessions, setSessions] = useState<MeSessionsItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -48,7 +52,7 @@ export default function MyPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({ limit: '50' });
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
     if (filter !== 'all') params.set('status', filter);
     fetch(`/api/me/sessions?${params}`)
       .then(async (res) => {
@@ -59,6 +63,7 @@ export default function MyPage() {
           return;
         }
         const data = (await res.json()) as MeSessionsResponse;
+        setError(null);
         setSessions(data.sessions);
         setTotal(data.total);
       })
@@ -71,7 +76,7 @@ export default function MyPage() {
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [filter, page]);
 
   const evaluatedCount = sessions.filter((s) => s.status === 'evaluated').length;
   const totalTokens = sessions.reduce(
@@ -126,7 +131,10 @@ export default function MyPage() {
               <button
                 key={f.value}
                 type="button"
-                onClick={() => setFilter(f.value)}
+                onClick={() => {
+                  setFilter(f.value);
+                  setPage(1);
+                }}
                 className="rounded font-mono"
                 style={{
                   padding: '5px 10px',
@@ -190,9 +198,7 @@ export default function MyPage() {
 
             {sessions.map((s, i) => {
               const isInProgress = s.status === 'in_progress';
-              const target = isInProgress
-                ? `/challenge/${s.id}`
-                : `/results/${s.id}`;
+              const target = isInProgress ? `/challenge/${s.id}` : `/results/${s.id}`;
               return (
                 <Link
                   key={s.id}
@@ -201,8 +207,7 @@ export default function MyPage() {
                   style={{
                     gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
                     padding: '12px 16px',
-                    borderBottom:
-                      i < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
+                    borderBottom: i < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
                     opacity: s.status === 'abandoned' ? 0.45 : 1,
                   }}
                 >
@@ -225,6 +230,17 @@ export default function MyPage() {
               );
             })}
           </div>
+
+          {!loading && !error && total > 0 && (
+            <Pagination
+              page={page}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              itemLabel="sessions"
+              className="mt-4"
+            />
+          )}
         </div>
       </div>
     </div>
