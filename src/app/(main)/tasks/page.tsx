@@ -9,17 +9,18 @@ import { getErrorMessage } from '@/lib/api/errors';
 import type { TaskListItem, ListTasksResponse, ApiError } from '@/lib/api/contracts';
 
 const CATEGORIES = [
-  'regex',
-  'debug',
+  'implementation',
+  'diagnosis',
   'review',
   'component',
-  'algo',
-  'api_design',
+  'architecture',
   'test',
-  'arch',
-  'refactor',
   'security',
-  'perf',
+  'communication',
+  'creative',
+  'analysis',
+  'workflow',
+  'strategy',
 ] as const;
 
 function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
@@ -211,9 +212,7 @@ export default function TasksPage() {
                   Tasks
                 </h1>
                 <div className="text-text-3 mt-1" style={{ fontSize: 12 }}>
-                  {loading
-                    ? '불러오는 중…'
-                    : `${filtered.length} of ${tasks.length} tasks`}
+                  {loading ? '불러오는 중…' : `${filtered.length} of ${tasks.length} tasks`}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -272,11 +271,7 @@ export default function TasksPage() {
           )}
 
           {filtered.map((t) => (
-            <TaskRow
-              key={t.slug}
-              task={t}
-              onClick={() => router.push(`/tasks/${t.slug}`)}
-            />
+            <TaskRow key={t.slug} task={t} onClick={() => router.push(`/tasks/${t.slug}`)} />
           ))}
         </div>
       </div>
