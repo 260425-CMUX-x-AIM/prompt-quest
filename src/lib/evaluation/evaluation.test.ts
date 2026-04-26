@@ -1,8 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HARD_CODED_CHALLENGE } from '@/lib/challenge';
 import { aggregateEvaluation } from '@/lib/evaluation/aggregator';
+import { judgeConversation } from '@/lib/evaluation/judge';
 import { analyzeQuantitative } from '@/lib/evaluation/quantitative';
 import type { EvaluationInput } from '@/lib/evaluation/types';
+
+const { createJsonCompletionMock } = vi.hoisted(() => ({
+  createJsonCompletionMock: vi.fn(),
+}));
+
+vi.mock('@/lib/evaluation/providers', async () => {
+  const actual = await vi.importActual<object>('@/lib/evaluation/providers');
+
+  return {
+    ...actual,
+    createJsonCompletion: createJsonCompletionMock,
+  };
+});
 
 const baseInput: EvaluationInput = {
   slug: HARD_CODED_CHALLENGE.slug,
@@ -23,21 +37,26 @@ const baseInput: EvaluationInput = {
     },
   ],
   usage: {
-    inputTokens: 320,
-    outputTokens: 180,
+    input_tokens: 320,
+    output_tokens: 180,
   },
-  elapsedSeconds: 150,
-  attemptCount: 1,
+  elapsed_seconds: 150,
+  attempt_count: 1,
 };
+
+beforeEach(() => {
+  createJsonCompletionMock.mockReset();
+});
 
 describe('analyzeQuantitative', () => {
   it('기준보다 효율적이면 높은 효율 점수를 반환한다', () => {
     const result = analyzeQuantitative(baseInput, HARD_CODED_CHALLENGE.baseline);
 
-    expect(result.efficiency.tokenScore).toBe(12);
-    expect(result.efficiency.attemptScore).toBe(12);
-    expect(result.efficiency.timeScore).toBe(6);
+    expect(result.efficiency.token_score).toBe(12);
+    expect(result.efficiency.attempt_score).toBe(12);
+    expect(result.efficiency.time_score).toBe(6);
     expect(result.efficiency.total).toBeGreaterThanOrEqual(29);
+    expect(result.efficiency.baseline_source).toBe('estimated');
   });
 
   it('중복 지시와 짧은 입력이 많으면 효율 총점이 내려간다', () => {
@@ -51,22 +70,23 @@ describe('analyzeQuantitative', () => {
           { role: 'assistant', content: '다시 설명해 주세요.' },
           { role: 'user', content: '고쳐줘' },
         ],
-        elapsedSeconds: 400,
-        attemptCount: 4,
+        elapsed_seconds: 400,
+        attempt_count: 4,
         usage: {
-          inputTokens: 900,
-          outputTokens: 700,
+          input_tokens: 900,
+          output_tokens: 700,
         },
       },
       HARD_CODED_CHALLENGE.baseline,
     );
 
-    expect(result.patterns.redundancyRatio).toBeGreaterThan(0.4);
-    expect(result.efficiency.total).toBeLessThan(15);
+    expect(result.patterns.redundancy_ratio).toBeGreaterThan(0.4);
+    expect(result.efficiency.total).toBeLessThan(16);
+    expect(result.pattern_adjustment).toBeLessThan(0);
   });
 });
 
-describe('aggregateEvaluation', () => {
+describe('judgeConversation', () => {
   const config = {
     provider: 'openai' as const,
     validatorModel: 'gpt-4.1-mini',
@@ -74,35 +94,71 @@ describe('aggregateEvaluation', () => {
     apiKey: 'test',
   };
 
+  it('judge를 3회 실행해 평균과 표준편차를 계산한다', async () => {
+    createJsonCompletionMock
+      .mockResolvedValueOnce({
+        clarity: { score: 8, reason: '첫 요청이 구체적입니다.' },
+        context: { score: 9, reason: '이전 응답을 잘 이어 갑니다.' },
+        recovery: { score: 7, reason: '수정 방향이 명확합니다.' },
+        feedback: { good: '좋았습니다.', improve: '조금 더 빨리 반례를 주세요.' },
+      })
+      .mockResolvedValueOnce({
+        clarity: { score: 7, reason: '핵심은 명확합니다.' },
+        context: { score: 8, reason: '대체로 맥락을 유지합니다.' },
+        recovery: { score: 8, reason: '복구 지시가 좋습니다.' },
+        feedback: { good: '좋았습니다.', improve: '반례를 더 빨리 주세요.' },
+      })
+      .mockResolvedValueOnce({
+        clarity: { score: 9, reason: '처음 요청이 매우 구체적입니다.' },
+        context: { score: 8, reason: '컨텍스트 활용이 좋습니다.' },
+        recovery: { score: 7, reason: '복구 시도가 안정적입니다.' },
+        feedback: { good: '좋았습니다.', improve: '출력 형식을 더 빨리 고정해 보세요.' },
+      });
+
+    const result = await judgeConversation(
+      config,
+      HARD_CODED_CHALLENGE,
+      baseInput.messages,
+      baseInput.artifact,
+    );
+
+    expect(createJsonCompletionMock).toHaveBeenCalledTimes(3);
+    expect(result.successful_runs).toBe(3);
+    expect(result.clarity.score).toBe(8);
+    expect(result.context.score).toBeGreaterThanOrEqual(8);
+    expect(result.inter_run_stddev.clarity).toBeGreaterThan(0);
+    expect(result.raw_runs).toHaveLength(3);
+  });
+});
+
+describe('aggregateEvaluation', () => {
   it('validator fail이면 총점을 0점으로 반환한다', () => {
     const result = aggregateEvaluation({
-      config,
       challenge: HARD_CODED_CHALLENGE,
       input: baseInput,
       validator: {
         passed: false,
-        passedRequirements: ['req-1'],
-        failedRequirements: [{ id: 'req-2', reason: '도메인 점 조건을 충족하지 못함' }],
-        overallReason: '요구사항 일부가 누락되었습니다.',
+        passed_requirements: ['req-1'],
+        failed_requirements: [{ id: 'req-2', reason: '도메인 점 조건을 충족하지 못함' }],
+        overall_reason: '요구사항 일부가 누락되었습니다.',
       },
     });
 
-    expect(result.totalScore).toBe(0);
-    expect(result.validatorPassed).toBe(false);
+    expect(result.total_score).toBe(0);
+    expect(result.validator_passed).toBe(false);
     expect(result.metricReasons[0]?.reason).toContain('요구사항 일부가 누락되었습니다.');
   });
 
   it('validator pass이면 100점 만점 기준으로 항목 점수를 합산한다', () => {
     const quantitative = analyzeQuantitative(baseInput, HARD_CODED_CHALLENGE.baseline);
     const result = aggregateEvaluation({
-      config,
       challenge: HARD_CODED_CHALLENGE,
       input: baseInput,
       validator: {
         passed: true,
-        passedRequirements: ['req-1', 'req-2', 'req-3'],
-        failedRequirements: [],
-        overallReason: '모든 요구사항을 충족했습니다.',
+        passed_requirements: ['req-1', 'req-2', 'req-3'],
+        failed_requirements: [],
+        overall_reason: '모든 요구사항을 충족했습니다.',
       },
       quantitative,
       judge: {
@@ -113,13 +169,30 @@ describe('aggregateEvaluation', () => {
           good: '맥락을 잘 이어 갔습니다.',
           improve: 'edge case를 더 빨리 제시해 보세요.',
         },
+        raw_runs: [
+          {
+            clarity: { score: 8, reason: '처음 요청이 구체적이었습니다.' },
+            context: { score: 9, reason: '이전 응답을 이어서 개선했습니다.' },
+            recovery: { score: 8, reason: '오류를 분명히 짚고 수정했습니다.' },
+            feedback: {
+              good: '맥락을 잘 이어 갔습니다.',
+              improve: 'edge case를 더 빨리 제시해 보세요.',
+            },
+          },
+        ],
+        inter_run_stddev: { clarity: 0.6, context: 0.5, recovery: 0.4 },
+        successful_runs: 3,
       },
+      scoreDistribution: [60, 72, 81, 90],
     });
 
-    expect(result.totalScore).toBeLessThanOrEqual(100);
-    expect(result.totalScore).toBeGreaterThan(80);
-    expect(result.breakdown.correctness).toBe(40);
-    expect(result.breakdown.context).toBe(13.5);
-    expect(result.breakdown.clarity).toBe(4);
+    expect(result.total_score).toBeLessThanOrEqual(100);
+    expect(result.total_score).toBeGreaterThan(80);
+    expect(result.scores.correctness).toBe(40);
+    expect(result.scores.context).toBe(13.5);
+    expect(result.scores.clarity).toBe(4);
+    expect(result.scores.pattern_bonus).toBeGreaterThanOrEqual(0);
+    expect(result.percentile).toBeGreaterThan(0);
+    expect(result.meta.is_low_confidence).toBe(false);
   });
 });

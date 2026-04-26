@@ -10,10 +10,7 @@ function isEvaluationInput(value: unknown): value is EvaluationInput {
     typeof candidate.slug === 'string' &&
     typeof candidate.artifact === 'string' &&
     Array.isArray(candidate.messages) &&
-    typeof candidate.usage?.inputTokens === 'number' &&
-    typeof candidate.usage?.outputTokens === 'number' &&
-    typeof candidate.elapsedSeconds === 'number' &&
-    typeof candidate.attemptCount === 'number'
+    typeof candidate.usage === 'object'
   );
 }
 
@@ -31,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const input: EvaluationInput = {
-    ...body,
+    slug: body.slug,
     artifact: body.artifact.trim(),
     messages: body.messages
       .filter(
@@ -45,6 +42,12 @@ export async function POST(request: Request) {
         role: message.role,
         content: message.content.trim(),
       })),
+    usage: {
+      input_tokens: body.usage.input_tokens ?? body.usage.inputTokens ?? 0,
+      output_tokens: body.usage.output_tokens ?? body.usage.outputTokens ?? 0,
+    },
+    elapsed_seconds: body.elapsed_seconds ?? body.elapsedSeconds ?? 0,
+    attempt_count: body.attempt_count ?? body.attemptCount ?? 1,
   };
 
   if (!input.artifact) {

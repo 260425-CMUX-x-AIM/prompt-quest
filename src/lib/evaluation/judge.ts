@@ -1,6 +1,7 @@
 import type { ChallengeDefinition } from '@/lib/challenge';
 import { createJsonCompletion, type EvaluationProviderConfig } from '@/lib/evaluation/providers';
-import type { EvaluationMessage, JudgeResult } from '@/lib/evaluation/types';
+import type { EvaluationMessage } from '@/lib/evaluation/types';
+import type { JudgeResult, JudgeRunResult } from '@/lib/types/evaluation';
 
 interface JudgeResponse {
   clarity?: { score?: number; reason?: string };
@@ -41,6 +42,7 @@ export async function judgeConversation(
   challenge: ChallengeDefinition,
   messages: EvaluationMessage[],
   artifact: string,
+  runCount: number = 3,
 ): Promise<JudgeResult> {
   const prompt = `
 [태스크]
@@ -65,14 +67,59 @@ ${artifact}
 </artifact>
 `;
 
-  const response = await createJsonCompletion<JudgeResponse>(config, {
-    system: JUDGE_SYSTEM,
-    prompt,
-    model: config.judgeModel,
-    temperature: 0.2,
-    maxOutputTokens: 1200,
-  });
+  const runs = await Promise.all(
+    Array.from({ length: runCount }, async (_, index) => {
+      try {
+        const response = await createJsonCompletion<JudgeResponse>(config, {
+          system: JUDGE_SYSTEM,
+          prompt,
+          model: config.judgeModel,
+          temperature: 0.3,
+          maxOutputTokens: 1200,
+          seed: index,
+        });
 
+        return normalizeRunResult(response);
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const successfulRuns = runs.filter((run): run is JudgeRunResult => run !== null);
+  if (successfulRuns.length === 0) {
+    throw new Error('judge_all_failed');
+  }
+
+  const clarityScore = average(successfulRuns.map((run) => run.clarity.score));
+  const contextScore = average(successfulRuns.map((run) => run.context.score));
+  const recoveryScore = average(successfulRuns.map((run) => run.recovery.score));
+
+  return {
+    clarity: {
+      score: clarityScore,
+      reason: pickReasonForAverage(successfulRuns, 'clarity', clarityScore),
+    },
+    context: {
+      score: contextScore,
+      reason: pickReasonForAverage(successfulRuns, 'context', contextScore),
+    },
+    recovery: {
+      score: recoveryScore,
+      reason: pickReasonForAverage(successfulRuns, 'recovery', recoveryScore),
+    },
+    feedback: pickMedianFeedback(successfulRuns),
+    raw_runs: successfulRuns,
+    inter_run_stddev: {
+      clarity: standardDeviation(successfulRuns.map((run) => run.clarity.score)),
+      context: standardDeviation(successfulRuns.map((run) => run.context.score)),
+      recovery: standardDeviation(successfulRuns.map((run) => run.recovery.score)),
+    },
+    successful_runs: successfulRuns.length,
+  };
+}
+
+function normalizeRunResult(response: JudgeResponse): JudgeRunResult {
   return {
     clarity: normalizeDimension(response.clarity, 7),
     context: normalizeDimension(response.context, 7),
@@ -89,13 +136,58 @@ ${artifact}
 function normalizeDimension(
   value: JudgeResponse['clarity'] | undefined,
   fallbackScore: number,
-): JudgeResult['clarity'] {
+): JudgeRunResult['clarity'] {
   const score = typeof value?.score === 'number' ? value.score : fallbackScore;
 
   return {
     score: clamp(Math.round(score * 10) / 10, 0, 10),
     reason: value?.reason?.trim() || '평가 이유가 제공되지 않았습니다.',
   };
+}
+
+function pickReasonForAverage(
+  runs: JudgeRunResult[],
+  key: 'clarity' | 'context' | 'recovery',
+  averageScore: number,
+): string {
+  return runs.reduce(
+    (best, run) => {
+      const diff = Math.abs(run[key].score - averageScore);
+      return diff < best.diff ? { diff, reason: run[key].reason } : best;
+    },
+    { diff: Number.POSITIVE_INFINITY, reason: runs[0]?.[key].reason ?? '평가 이유가 없습니다.' },
+  ).reason;
+}
+
+function pickMedianFeedback(runs: JudgeRunResult[]): JudgeRunResult['feedback'] {
+  const ranked = [...runs].sort((left, right) => sumScores(left) - sumScores(right));
+  return (
+    ranked[Math.floor(ranked.length / 2)]?.feedback ?? {
+      good: '핵심 요구사항을 빠르게 좁혀 나간 점이 좋았습니다.',
+      improve: '처음 프롬프트에 예시와 제약을 더 넣으면 더 적은 턴으로 끝낼 수 있습니다.',
+    }
+  );
+}
+
+function sumScores(run: JudgeRunResult): number {
+  return run.clarity.score + run.context.score + run.recovery.score;
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function standardDeviation(values: number[]): number {
+  if (values.length <= 1) return 0;
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance =
+    values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(values.length, 1);
+  return round(Math.sqrt(variance));
+}
+
+function round(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 function clamp(value: number, min: number, max: number): number {

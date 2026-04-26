@@ -1,6 +1,6 @@
 import type { ChallengeDefinition } from '@/lib/challenge';
 import { createJsonCompletion, type EvaluationProviderConfig } from '@/lib/evaluation/providers';
-import type { ValidatorResult } from '@/lib/evaluation/types';
+import type { ValidatorResult } from '@/lib/types/evaluation';
 
 interface ValidatorResponse {
   passed_requirements?: string[];
@@ -87,8 +87,8 @@ ${artifact}
 
   return {
     passed: failedRequirements.length === 0,
-    passedRequirements: (response.passed_requirements ?? []).filter(Boolean),
-    failedRequirements,
-    overallReason: response.overall_reason?.trim() || '검증 결과 요약이 없습니다.',
+    passed_requirements: (response.passed_requirements ?? []).filter(Boolean),
+    failed_requirements: failedRequirements,
+    overall_reason: response.overall_reason?.trim() || '검증 결과 요약이 없습니다.',
   };
 }

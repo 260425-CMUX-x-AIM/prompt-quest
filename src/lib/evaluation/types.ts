@@ -1,4 +1,10 @@
-import type { ChallengeBaseline, ChallengeDefinition } from '@/lib/challenge';
+import type { ChallengeDefinition } from '@/lib/challenge';
+import type {
+  AggregatedResult,
+  JudgeResult,
+  QuantitativeResult,
+  ValidatorResult,
+} from '@/lib/types/evaluation';
 
 export interface EvaluationMessage {
   role: 'user' | 'assistant';
@@ -6,8 +12,8 @@ export interface EvaluationMessage {
 }
 
 export interface EvaluationUsage {
-  inputTokens: number;
-  outputTokens: number;
+  input_tokens: number;
+  output_tokens: number;
 }
 
 export interface EvaluationInput {
@@ -15,21 +21,8 @@ export interface EvaluationInput {
   artifact: string;
   messages: EvaluationMessage[];
   usage: EvaluationUsage;
-  elapsedSeconds: number;
-  attemptCount: number;
-}
-
-export interface EvaluationBreakdown {
-  correctness: number;
-  efficiency: number;
-  context: number;
-  recovery: number;
-  clarity: number;
-}
-
-export interface EvaluationFeedback {
-  good: string;
-  improve: string;
+  elapsed_seconds: number;
+  attempt_count: number;
 }
 
 export interface EvaluationMetricReason {
@@ -39,70 +32,24 @@ export interface EvaluationMetricReason {
   reason: string;
 }
 
-export interface ValidatorFailure {
-  id: string;
-  reason: string;
+export type EvaluationChallengeSummary = Pick<
+  ChallengeDefinition,
+  'slug' | 'title' | 'category' | 'difficulty'
+>;
+
+export interface EvaluationSummary {
+  attempt_count: number;
+  elapsed_seconds: number;
+  total_tokens: number;
+  message_count: number;
 }
 
-export interface ValidatorResult {
-  passed: boolean;
-  passedRequirements: string[];
-  failedRequirements: ValidatorFailure[];
-  overallReason: string;
-}
-
-export interface QuantitativeResult {
-  efficiency: {
-    tokenScore: number;
-    attemptScore: number;
-    timeScore: number;
-    total: number;
-    baseline: ChallengeBaseline;
-  };
-  patterns: {
-    redundancyRatio: number;
-    contextReferenceCount: number;
-    avgUserMessageLength: number;
-    errorRecoveryAttempts: number;
-  };
-  reasons: {
-    token: string;
-    attempt: string;
-    time: string;
-  };
-}
-
-export interface JudgeDimension {
-  score: number;
-  reason: string;
-}
-
-export interface JudgeResult {
-  clarity: JudgeDimension;
-  context: JudgeDimension;
-  recovery: JudgeDimension;
-  feedback: EvaluationFeedback;
-}
-
-export interface EvaluationResult {
+export interface EvaluationResult extends AggregatedResult {
   slug: string;
-  challenge: Pick<ChallengeDefinition, 'slug' | 'title' | 'category' | 'difficulty'>;
-  totalScore: number;
-  validatorPassed: boolean;
-  breakdown: EvaluationBreakdown;
+  challenge: EvaluationChallengeSummary;
+  validator_passed: boolean;
   metricReasons: EvaluationMetricReason[];
-  feedback: EvaluationFeedback;
-  summary: {
-    attemptCount: number;
-    elapsedSeconds: number;
-    totalTokens: number;
-    messageCount: number;
-  };
-  meta: {
-    evaluator: 'openai' | 'gemini';
-    validatorModel: string;
-    judgeModel: string;
-  };
+  summary: EvaluationSummary;
   validator: ValidatorResult;
   quantitative?: QuantitativeResult;
   judge?: JudgeResult;

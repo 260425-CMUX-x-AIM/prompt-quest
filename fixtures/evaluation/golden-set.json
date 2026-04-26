@@ -1,0 +1,91 @@
+[
+  {
+    "id": "golden-regex-pass",
+    "slug": "regex-email-001",
+    "input": {
+      "slug": "regex-email-001",
+      "artifact": "const EMAIL_REGEX = /\\b[A-Za-z0-9._%+\\-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\\.[A-Za-z]+\\b/g;",
+      "messages": [
+        {
+          "role": "user",
+          "content": "이메일 정규식을 만들어줘. 도메인에 점이 필요하고 ReDoS는 피해야 해."
+        },
+        {
+          "role": "assistant",
+          "content": "초안을 만들었어요."
+        },
+        {
+          "role": "user",
+          "content": "위 패턴에서 a@b.c 도 통과하도록 수정해줘."
+        }
+      ],
+      "usage": {
+        "input_tokens": 320,
+        "output_tokens": 180
+      },
+      "elapsed_seconds": 150,
+      "attempt_count": 1
+    },
+    "validator": {
+      "passed": true,
+      "passed_requirements": ["req-1", "req-2", "req-3"],
+      "failed_requirements": [],
+      "overall_reason": "모든 요구사항을 충족했습니다."
+    },
+    "judge": {
+      "clarity": { "score": 8, "reason": "첫 요청이 구체적이었습니다." },
+      "context": { "score": 9, "reason": "이전 응답을 이어서 개선했습니다." },
+      "recovery": { "score": 8, "reason": "수정 방향을 분명히 제시했습니다." },
+      "feedback": {
+        "good": "맥락을 잘 이어 갔습니다.",
+        "improve": "edge case를 더 빨리 제시해 보세요."
+      },
+      "raw_runs": [
+        {
+          "clarity": { "score": 8, "reason": "첫 요청이 구체적이었습니다." },
+          "context": { "score": 9, "reason": "이전 응답을 이어서 개선했습니다." },
+          "recovery": { "score": 8, "reason": "수정 방향을 분명히 제시했습니다." },
+          "feedback": {
+            "good": "맥락을 잘 이어 갔습니다.",
+            "improve": "edge case를 더 빨리 제시해 보세요."
+          }
+        }
+      ],
+      "inter_run_stddev": { "clarity": 0.4, "context": 0.5, "recovery": 0.4 },
+      "successful_runs": 3
+    },
+    "score_distribution": [61, 70, 77, 83, 92],
+    "expected_total_score": { "min": 90, "max": 100 },
+    "expected_low_confidence": false
+  },
+  {
+    "id": "golden-debug-fail",
+    "slug": "debug-async-001",
+    "input": {
+      "slug": "debug-async-001",
+      "artifact": "export async function buildCheckoutSummary() { return null; }",
+      "messages": [
+        {
+          "role": "user",
+          "content": "쿠폰 처리 버그를 고쳐줘."
+        }
+      ],
+      "usage": {
+        "input_tokens": 90,
+        "output_tokens": 70
+      },
+      "elapsed_seconds": 80,
+      "attempt_count": 1
+    },
+    "validator": {
+      "passed": false,
+      "passed_requirements": [],
+      "failed_requirements": [
+        { "id": "req-2", "reason": "주문 없음과 쿠폰 실패를 구분 처리하지 못했습니다." }
+      ],
+      "overall_reason": "핵심 요구사항 일부가 누락되었습니다."
+    },
+    "expected_total_score": { "min": 0, "max": 0 },
+    "expected_low_confidence": true
+  }
+]

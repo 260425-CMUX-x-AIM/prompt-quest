@@ -303,9 +303,12 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
         role: message.role,
         content: message.content,
       })),
-      usage,
-      elapsedSeconds: sessionSeconds,
-      attemptCount,
+      usage: {
+        input_tokens: usage.inputTokens,
+        output_tokens: usage.outputTokens,
+      },
+      elapsed_seconds: sessionSeconds,
+      attempt_count: attemptCount,
     });
 
     router.push(`/eval/${t.slug}`);

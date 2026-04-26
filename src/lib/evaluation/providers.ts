@@ -6,6 +6,7 @@ export interface JsonCompletionOptions {
   model: string;
   temperature?: number;
   maxOutputTokens?: number;
+  seed?: number;
 }
 
 export interface EvaluationProviderConfig {
@@ -77,6 +78,7 @@ async function createOpenAiJsonCompletion<T>(
       model: options.model,
       temperature: options.temperature ?? 0,
       max_tokens: options.maxOutputTokens ?? 1200,
+      ...(typeof options.seed === 'number' ? { seed: options.seed } : {}),
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: options.system },

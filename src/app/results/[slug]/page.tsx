@@ -91,7 +91,7 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                   className="font-mono font-semibold text-acc"
                   style={{ fontSize: 88, lineHeight: 0.9, letterSpacing: '-0.04em' }}
                 >
-                  {result.totalScore}
+                  {result.total_score}
                 </span>
                 <span className="font-mono text-text-3" style={{ fontSize: 18, marginBottom: 14 }}>
                   /100
@@ -107,13 +107,14 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                     background: 'var(--color-acc-dim)',
                   }}
                 >
-                  {result.validatorPassed ? 'PASS' : 'FAIL'}
+                  {result.validator_passed ? 'PASS' : 'FAIL'}
                 </span>
                 <span
                   className="inline-flex items-center font-mono text-text-2 bg-bg-1 border border-line-2 rounded"
                   style={{ fontSize: 11, padding: '2px 7px' }}
                 >
-                  {result.meta.evaluator} · {result.meta.validatorModel}
+                  {result.meta.baseline_source} ·{' '}
+                  {result.meta.is_low_confidence ? 'low confidence' : 'stable'}
                 </span>
               </div>
             </div>
@@ -130,10 +131,10 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                 {result.challenge.title}
               </h1>
               <div className="grid grid-cols-4 gap-2">
-                <StatChip label="시도" value={`${result.summary.attemptCount}회`} accent />
-                <StatChip label="시간" value={formatElapsed(result.summary.elapsedSeconds)} />
-                <StatChip label="토큰" value={result.summary.totalTokens.toLocaleString()} />
-                <StatChip label="메시지" value={`${result.summary.messageCount}`} />
+                <StatChip label="시도" value={`${result.summary.attempt_count}회`} accent />
+                <StatChip label="시간" value={formatElapsed(result.summary.elapsed_seconds)} />
+                <StatChip label="토큰" value={result.summary.total_tokens.toLocaleString()} />
+                <StatChip label="메시지" value={`${result.summary.message_count}`} />
               </div>
             </div>
           </div>
@@ -247,7 +248,7 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                       score
                     </span>
                     <span className="font-mono text-acc" style={{ fontSize: 11.5 }}>
-                      {result.totalScore}/100
+                      {result.total_score}/100
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -255,15 +256,23 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                       validator
                     </span>
                     <span className="font-mono" style={{ fontSize: 11.5 }}>
-                      {result.validatorPassed ? 'pass' : 'fail'}
+                      {result.validator_passed ? 'pass' : 'fail'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-3" style={{ fontSize: 11.5 }}>
-                      judge model
+                      percentile
                     </span>
                     <span className="font-mono" style={{ fontSize: 11.5 }}>
-                      {result.meta.judgeModel}
+                      {result.percentile}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-3" style={{ fontSize: 11.5 }}>
+                      judge stddev
+                    </span>
+                    <span className="font-mono" style={{ fontSize: 11.5 }}>
+                      {result.meta.judge_max_stddev}
                     </span>
                   </div>
                 </div>

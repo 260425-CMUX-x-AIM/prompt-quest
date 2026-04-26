@@ -31,7 +31,7 @@ export function readPendingEvaluation(): EvaluationInput | null {
   }
 
   try {
-    const parsed = JSON.parse(raw) as EvaluationInput;
+    const parsed = normalizePendingEvaluation(JSON.parse(raw));
     pendingSnapshotCache = { raw, value: parsed };
     return parsed;
   } catch {
@@ -69,7 +69,7 @@ export function readEvaluationResult(slug: string): EvaluationResult | null {
   }
 
   try {
-    const parsed = JSON.parse(raw) as EvaluationResult;
+    const parsed = normalizeEvaluationResult(JSON.parse(raw));
     resultSnapshotCache.set(slug, { raw, value: parsed });
     return parsed;
   } catch {
@@ -77,6 +77,61 @@ export function readEvaluationResult(slug: string): EvaluationResult | null {
     resultSnapshotCache.set(slug, { raw: null, value: null });
     return null;
   }
+}
+
+function normalizePendingEvaluation(value: unknown): EvaluationInput {
+  const candidate = value as Partial<EvaluationInput> & {
+    elapsedSeconds?: number;
+    attemptCount?: number;
+    usage?: Partial<EvaluationInput['usage']> & {
+      inputTokens?: number;
+      outputTokens?: number;
+    };
+  };
+
+  return {
+    slug: candidate.slug ?? '',
+    artifact: candidate.artifact ?? '',
+    messages: Array.isArray(candidate.messages)
+      ? candidate.messages.filter(
+          (message): message is EvaluationInput['messages'][number] =>
+            !!message &&
+            (message.role === 'user' || message.role === 'assistant') &&
+            typeof message.content === 'string',
+        )
+      : [],
+    usage: {
+      input_tokens: candidate.usage?.input_tokens ?? candidate.usage?.inputTokens ?? 0,
+      output_tokens: candidate.usage?.output_tokens ?? candidate.usage?.outputTokens ?? 0,
+    },
+    elapsed_seconds: candidate.elapsed_seconds ?? candidate.elapsedSeconds ?? 0,
+    attempt_count: candidate.attempt_count ?? candidate.attemptCount ?? 1,
+  };
+}
+
+function normalizeEvaluationResult(value: unknown): EvaluationResult {
+  const candidate = value as Partial<EvaluationResult> & {
+    totalScore?: number;
+    validatorPassed?: boolean;
+    summary?: Partial<EvaluationResult['summary']> & {
+      attemptCount?: number;
+      elapsedSeconds?: number;
+      totalTokens?: number;
+      messageCount?: number;
+    };
+  };
+
+  return {
+    ...(candidate as EvaluationResult),
+    total_score: candidate.total_score ?? candidate.totalScore ?? 0,
+    validator_passed: candidate.validator_passed ?? candidate.validatorPassed ?? false,
+    summary: {
+      attempt_count: candidate.summary?.attempt_count ?? candidate.summary?.attemptCount ?? 0,
+      elapsed_seconds: candidate.summary?.elapsed_seconds ?? candidate.summary?.elapsedSeconds ?? 0,
+      total_tokens: candidate.summary?.total_tokens ?? candidate.summary?.totalTokens ?? 0,
+      message_count: candidate.summary?.message_count ?? candidate.summary?.messageCount ?? 0,
+    },
+  };
 }
 
 function subscribeToStorage(onStoreChange: () => void): () => void {

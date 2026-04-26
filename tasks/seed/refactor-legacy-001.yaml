@@ -1,0 +1,63 @@
+metadata:
+  id: refactor-legacy-001
+  title: '콜백 헬 주문 처리 모듈 리팩토링'
+  category: refactor
+  difficulty: hard
+  estimated_minutes: 28
+  version: 1
+  author: '운영자'
+  created_at: '2026-04-25'
+
+context:
+  background: |
+    주문 검증, 재고 확인, 결제, 이메일 발송이 중첩 콜백으로 얽혀 있습니다.
+  scenario: |
+    에러 흐름, 롤백, 가독성까지 반영해 리팩토링해야 합니다.
+    단순 문법 치환이 아니라 단계별 책임 분리와 부분 실패 기준 정리가 필요합니다.
+
+requirements:
+  - id: req-1
+    description: '콜백 헬 제거'
+    weight: 0.3
+  - id: req-2
+    description: '검증/재고/결제/후처리 단계가 읽히도록 구조화'
+    weight: 0.35
+  - id: req-3
+    description: '부분 실패 처리 기준이 명확해야 함'
+    weight: 0.35
+
+artifact_format:
+  type: function
+  language: typescript
+  stub: |
+    export async function processOrder(orderId: string): Promise<ProcessOrderResult> {
+      // TODO
+    }
+
+test_cases:
+  - id: tc-positive-1
+    input: '모든 단계 성공'
+    expected_output: '상태 completed'
+    type: positive
+  - id: tc-edge-1
+    input: '결제 실패'
+    expected_output: '재고 예약 해제, 상태 payment_failed'
+    type: edge_case
+  - id: tc-edge-2
+    input: '이메일 발송 실패'
+    expected_output: '주문은 완료, 경고 로깅 또는 후속 재시도 큐'
+    type: edge_case
+  - id: tc-error-1
+    input: '존재하지 않는 주문'
+    expected_output: 'ORDER_NOT_FOUND 에러'
+    type: error_handling
+
+constraints:
+  max_attempts: 8
+  time_limit_seconds: 1800
+
+baseline:
+  median_total_tokens: 2600
+  median_attempts: 4
+  median_time_seconds: 1440
+  computed_from_sessions: 0

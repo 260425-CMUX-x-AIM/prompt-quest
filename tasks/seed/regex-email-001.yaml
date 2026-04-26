@@ -1,0 +1,63 @@
+metadata:
+  id: regex-email-001
+  title: '이메일 추출 정규식 작성'
+  category: regex
+  difficulty: easy
+  estimated_minutes: 5
+  version: 1
+  author: '운영자'
+  created_at: '2026-04-25'
+
+context:
+  background: |
+    여러 형식이 섞여 있는 로그 텍스트에서 이메일 주소만 추출하는 정규식이 필요합니다.
+  scenario: |
+    JavaScript 스크립트에서 사용할 정규식을 작성해야 합니다.
+    로컬 파트, 서브도메인, +tag는 허용하되 잘못된 형식과 과도한 백트래킹은 피해야 합니다.
+
+requirements:
+  - id: req-1
+    description: '유효한 이메일 형식만 매칭'
+    weight: 0.5
+  - id: req-2
+    description: '도메인에는 . 이 최소 1개 포함'
+    weight: 0.3
+  - id: req-3
+    description: 'ReDoS에 취약한 패턴 금지'
+    weight: 0.2
+
+artifact_format:
+  type: regex
+  language: javascript
+  stub: |
+    const EMAIL_REGEX = /YOUR_PATTERN_HERE/g;
+
+test_cases:
+  - id: tc-positive-1
+    input: 'Contact: alice@example.com or bob@sub.test.org'
+    expected_matches: ['alice@example.com', 'bob@sub.test.org']
+    type: positive
+  - id: tc-negative-1
+    input: 'Invalid: not-an-email, @missing.com, foo@bar'
+    expected_matches: []
+    type: negative
+  - id: tc-edge-1
+    input: 'Edge: a@b.c, very.long+tag@company.co.uk'
+    expected_matches: ['a@b.c', 'very.long+tag@company.co.uk']
+    type: edge_case
+  - id: tc-edge-2
+    input: 'Punctuation: user@example.com, next line'
+    expected_matches: ['user@example.com']
+    type: edge_case
+
+constraints:
+  max_attempts: 5
+  time_limit_seconds: 600
+  forbidden_patterns:
+    - '.*'
+
+baseline:
+  median_total_tokens: 800
+  median_attempts: 2
+  median_time_seconds: 240
+  computed_from_sessions: 0

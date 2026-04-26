@@ -54,7 +54,7 @@ export default function EvalPage({ params }: { params: Promise<{ slug: string }>
 
         const data = (await response.json()) as EvaluationResult | { error: string };
 
-        if (!response.ok || !('totalScore' in data)) {
+        if (!response.ok || !('total_score' in data)) {
           throw new Error('error' in data ? data.error : '채점 API 응답 처리에 실패했습니다.');
         }
 

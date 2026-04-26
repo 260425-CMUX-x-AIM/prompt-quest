@@ -11,16 +11,24 @@ export async function runEvaluationPipeline(input: EvaluationInput): Promise<Eva
   const config = getEvaluationProviderConfig();
   const validator = await validateArtifact(config, challenge, input.artifact);
 
+  if (!validator.passed) {
+    return aggregateEvaluation({
+      challenge,
+      input,
+      validator,
+    });
+  }
+
   const quantitative = analyzeQuantitative(input, challenge.baseline);
   const judge = await judgeConversation(config, challenge, input.messages, input.artifact);
 
   return aggregateEvaluation({
-    config,
     challenge,
     input,
     validator,
     quantitative,
     judge,
+    scoreDistribution: [],
   });
 }
 
