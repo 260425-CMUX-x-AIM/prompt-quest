@@ -1,59 +1,77 @@
 'use client';
 
-import { use } from 'react';
+import { use, useMemo } from 'react';
 import Link from 'next/link';
 import NavBar from '@/components/NavBar';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import StatChip from '@/components/StatChip';
 import ProgressBar from '@/components/ProgressBar';
+import { ALL_TASKS } from '@/lib/data';
+import { useEvaluationResult } from '@/lib/evaluation/storage';
+import type { EvaluationResult } from '@/lib/evaluation/types';
+
+function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
 
 export default function ResultsPage({ params }: { params: Promise<{ slug: string }> }) {
-  use(params);
-  const score = 87;
-  const breakdown = [
-    {
-      k: 'correctness',
-      label: '정확성',
-      score: 40,
-      max: 40,
-      reason: 'Validator PASS · 모든 요구사항 충족',
-    },
-    {
-      k: 'efficiency',
-      label: '효율성',
-      score: 32,
-      max: 40,
-      reason: '토큰 ↓ 18% · 시도 1회 · 시간 +20%',
-    },
-    {
-      k: 'context',
-      label: '컨텍스트 활용',
-      score: 16.6,
-      max: 20,
-      reason: '이전 응답 정확히 참조 8.3/10',
-    },
-    {
-      k: 'recovery',
-      label: '에러 복구',
-      score: 9,
-      max: 10,
-      reason: 'edge case 발견 후 명확한 수정',
-    },
-    {
-      k: 'clarity',
-      label: '프롬프트 명확성',
-      score: 9,
-      max: 10,
-      reason: '첫 프롬프트에 요구사항·제약 명시',
-    },
-  ];
+  const { slug } = use(params);
+  const result: EvaluationResult | null = useEvaluationResult(slug);
+
+  const task = useMemo(() => ALL_TASKS.find((item) => item.slug === slug) || ALL_TASKS[0], [slug]);
+  const recommendedTask = useMemo(
+    () => ALL_TASKS.find((item) => item.slug !== slug && !item.locked) || ALL_TASKS[0],
+    [slug],
+  );
+
+  if (!result) {
+    return (
+      <div className="flex flex-col h-screen overflow-hidden bg-bg-0 text-text-1">
+        <NavBar />
+        <div className="flex-1 flex items-center justify-center" style={{ padding: 32 }}>
+          <div className="w-full max-w-[520px] bg-bg-1 border border-line rounded-[12px] p-6 text-center">
+            <div
+              className="font-mono text-text-3 mb-2"
+              style={{ fontSize: 11, letterSpacing: '0.08em' }}
+            >
+              RESULT NOT FOUND
+            </div>
+            <h1 className="font-medium mb-2" style={{ fontSize: 24 }}>
+              표시할 채점 결과가 없습니다
+            </h1>
+            <p className="text-text-2 mb-5" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+              로그인 없는 데모 모드에서는 현재 탭의 임시 저장소에서만 결과를 읽습니다. 챌린지
+              화면에서 다시 제출해 주세요.
+            </p>
+            <div className="flex gap-2">
+              <Link
+                href={`/challenge/${slug}`}
+                className="flex-1 flex items-center justify-center bg-acc text-acc-ink font-medium rounded-md border border-acc"
+                style={{ padding: '8px 12px', fontSize: 12.5 }}
+              >
+                챌린지로 돌아가기
+              </Link>
+              <Link
+                href="/tasks"
+                className="flex-1 flex items-center justify-center rounded-md border border-line text-text-1 hover:bg-bg-2"
+                style={{ padding: '8px 12px', fontSize: 12.5 }}
+              >
+                태스크 목록 보기
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg-0 text-text-1">
       <NavBar />
       <div className="flex-1 overflow-y-auto custom-scroll">
         <div className="max-w-[980px] mx-auto" style={{ padding: '32px 36px' }}>
-          {/* Hero */}
           <div
             className="grid gap-8 border-b border-line mb-7"
             style={{
@@ -73,12 +91,9 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                   className="font-mono font-semibold text-acc"
                   style={{ fontSize: 88, lineHeight: 0.9, letterSpacing: '-0.04em' }}
                 >
-                  {score}
+                  {result.totalScore}
                 </span>
-                <span
-                  className="font-mono text-text-3"
-                  style={{ fontSize: 18, marginBottom: 14 }}
-                >
+                <span className="font-mono text-text-3" style={{ fontSize: 18, marginBottom: 14 }}>
                   /100
                 </span>
               </div>
@@ -92,38 +107,37 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                     background: 'var(--color-acc-dim)',
                   }}
                 >
-                  ▲ TOP 12%
+                  {result.validatorPassed ? 'PASS' : 'FAIL'}
                 </span>
                 <span
                   className="inline-flex items-center font-mono text-text-2 bg-bg-1 border border-line-2 rounded"
                   style={{ fontSize: 11, padding: '2px 7px' }}
                 >
-                  +2 personal best
+                  {result.meta.evaluator} · {result.meta.validatorModel}
                 </span>
               </div>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <CategoryTag cat="regex" />
-                <DiffTag level="easy" />
+                <CategoryTag cat={result.challenge.category} />
+                <DiffTag level={result.challenge.difficulty} />
                 <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                  regex-email-001
+                  {result.challenge.slug}
                 </span>
               </div>
               <h1 className="font-medium mb-3.5" style={{ fontSize: 26 }}>
-                이메일 추출 정규식 작성
+                {result.challenge.title}
               </h1>
               <div className="grid grid-cols-4 gap-2">
-                <StatChip label="시도" value="1회" accent />
-                <StatChip label="시간" value="07:42" />
-                <StatChip label="토큰" value="1,234" />
-                <StatChip label="메시지" value="4" />
+                <StatChip label="시도" value={`${result.summary.attemptCount}회`} accent />
+                <StatChip label="시간" value={formatElapsed(result.summary.elapsedSeconds)} />
+                <StatChip label="토큰" value={result.summary.totalTokens.toLocaleString()} />
+                <StatChip label="메시지" value={`${result.summary.messageCount}`} />
               </div>
             </div>
           </div>
 
-          {/* Breakdown + aside */}
           <div className="grid gap-7" style={{ gridTemplateColumns: '1fr 320px' }}>
             <div>
               <div
@@ -133,69 +147,51 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                 ─── BREAKDOWN
               </div>
               <div className="bg-bg-1 border border-line rounded-[10px] overflow-hidden">
-                {breakdown.map((b, i) => {
-                  const pct = (b.score / b.max) * 100;
+                {result.metricReasons.map((metric, index) => {
+                  const pct = metric.max > 0 ? (metric.score / metric.max) * 100 : 0;
+                  const color =
+                    pct > 80
+                      ? 'var(--color-acc)'
+                      : pct > 50
+                        ? 'var(--color-warn)'
+                        : 'var(--color-err)';
+
                   return (
                     <div
-                      key={b.k}
+                      key={metric.label}
                       style={{
                         padding: '16px 18px',
                         borderBottom:
-                          i < breakdown.length - 1 ? '1px solid var(--color-line)' : 'none',
+                          index < result.metricReasons.length - 1
+                            ? '1px solid var(--color-line)'
+                            : 'none',
                       }}
                     >
                       <div className="flex justify-between items-baseline mb-1.5">
                         <div className="flex items-center gap-2.5">
                           <span className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                            {String(i + 1).padStart(2, '0')}
+                            {String(index + 1).padStart(2, '0')}
                           </span>
                           <span className="font-medium" style={{ fontSize: 14 }}>
-                            {b.label}
-                          </span>
-                          <span className="font-mono text-text-4" style={{ fontSize: 10 }}>
-                            {b.k}
+                            {metric.label}
                           </span>
                         </div>
                         <div className="font-mono" style={{ fontSize: 13 }}>
-                          <span
-                            className="font-semibold"
-                            style={{
-                              color:
-                                pct > 80
-                                  ? 'var(--color-acc)'
-                                  : pct > 50
-                                    ? 'var(--color-warn)'
-                                    : 'var(--color-err)',
-                            }}
-                          >
-                            {b.score}
+                          <span className="font-semibold" style={{ color }}>
+                            {metric.score}
                           </span>
-                          <span className="text-text-4"> / {b.max}</span>
+                          <span className="text-text-4"> / {metric.max}</span>
                         </div>
                       </div>
-                      <ProgressBar
-                        value={pct}
-                        color={
-                          pct > 80
-                            ? 'var(--color-acc)'
-                            : pct > 50
-                              ? 'var(--color-warn)'
-                              : 'var(--color-err)'
-                        }
-                        height={4}
-                      />
-                      <div
-                        className="text-text-3 mt-2"
-                        style={{ fontSize: 12, lineHeight: 1.5 }}
-                      >
-                        {b.reason}
+                      <ProgressBar value={pct} color={color} height={4} />
+                      <div className="text-text-3 mt-2" style={{ fontSize: 12, lineHeight: 1.5 }}>
+                        {metric.reason}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Feedback */}
               <div
                 className="font-mono text-text-3 mt-7 mb-3.5"
                 style={{ fontSize: 11, letterSpacing: '0.08em' }}
@@ -213,84 +209,63 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                   >
                     ◆ 잘한 점
                   </div>
-                  <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-                    첫 프롬프트에 요구사항·제약·출력 형식을 모두 포함했습니다. edge case를 발견하고
-                    이전 패턴을 명시적으로 참조하며 개선 방향을 제시한 것이 인상적입니다.
-                  </p>
+                  <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>{result.feedback.good}</p>
                 </div>
                 <div className="bg-bg-1 border border-line rounded-[10px] p-4.5">
                   <div
                     className="font-mono mb-2.5"
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: '0.06em',
-                      color: 'var(--color-warn)',
-                    }}
+                    style={{ fontSize: 10, letterSpacing: '0.06em', color: 'var(--color-warn)' }}
                   >
                     ◆ 개선할 점
                   </div>
                   <p className="text-text-2" style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-                    초기 프롬프트에 edge case 예시(
-                    <span className="font-mono text-text-1" style={{ fontSize: 11 }}>
-                      a@b.c
-                    </span>
-                    )를 함께 제시했다면 1턴에 종료할 수 있었습니다. 시간 효율 점수가 낮은 이유입니다.
+                    {result.feedback.improve}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Aside */}
             <div>
               <div
                 className="font-mono text-text-3 mb-3.5"
                 style={{ fontSize: 11, letterSpacing: '0.08em' }}
               >
-                ─── DISTRIBUTION
+                ─── SUMMARY
               </div>
               <div className="bg-bg-1 border border-line rounded-[10px] p-4 mb-4.5">
-                <div className="flex items-end gap-0.5 mb-2" style={{ height: 80 }}>
-                  {[3, 5, 8, 12, 18, 24, 28, 22, 15, 8].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-[1px]"
-                      style={{
-                        height: `${(h / 28) * 100}%`,
-                        background: i === 8 ? 'var(--color-acc)' : 'var(--color-bg-3)',
-                      }}
-                    />
-                  ))}
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                    0
-                  </span>
-                  <span className="font-mono text-acc" style={{ fontSize: 10 }}>
-                    you · 87
-                  </span>
-                  <span className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                    100
-                  </span>
-                </div>
-                <div className="h-px bg-line my-3" />
-                <div className="flex flex-col gap-1.5">
-                  {[
-                    ['median', '64', ''],
-                    ['top 10%', '89', ''],
-                    ['your percentile', '88.4', 'var(--color-acc)'],
-                  ].map(([l, v, c]) => (
-                    <div key={l} className="flex justify-between">
-                      <span className="text-text-3" style={{ fontSize: 11.5 }}>
-                        {l}
-                      </span>
-                      <span
-                        className="font-mono"
-                        style={{ fontSize: 11.5, color: c || 'var(--color-text-1)' }}
-                      >
-                        {v}
-                      </span>
-                    </div>
-                  ))}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between">
+                    <span className="text-text-3" style={{ fontSize: 11.5 }}>
+                      task
+                    </span>
+                    <span className="font-mono" style={{ fontSize: 11.5 }}>
+                      {task.title}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-3" style={{ fontSize: 11.5 }}>
+                      score
+                    </span>
+                    <span className="font-mono text-acc" style={{ fontSize: 11.5 }}>
+                      {result.totalScore}/100
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-3" style={{ fontSize: 11.5 }}>
+                      validator
+                    </span>
+                    <span className="font-mono" style={{ fontSize: 11.5 }}>
+                      {result.validatorPassed ? 'pass' : 'fail'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-3" style={{ fontSize: 11.5 }}>
+                      judge model
+                    </span>
+                    <span className="font-mono" style={{ fontSize: 11.5 }}>
+                      {result.meta.judgeModel}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -301,21 +276,18 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
                 ─── RECOMMENDED
               </div>
               <div className="bg-bg-1 border border-line rounded-[10px] p-3.5">
-                <div
-                  className="font-mono text-text-4 mb-2"
-                  style={{ fontSize: 10 }}
-                >
+                <div className="font-mono text-text-4 mb-2" style={{ fontSize: 10 }}>
                   NEXT
                 </div>
                 <div className="font-medium mb-1" style={{ fontSize: 13.5 }}>
-                  객체 배열 다중 키 정렬
+                  {recommendedTask.title}
                 </div>
                 <div className="flex gap-1.5 mb-3">
-                  <CategoryTag cat="algo" />
-                  <DiffTag level="medium" />
+                  <CategoryTag cat={recommendedTask.cat} />
+                  <DiffTag level={recommendedTask.diff} />
                 </div>
                 <Link
-                  href="/tasks/algo-sort-001"
+                  href={`/challenge/${recommendedTask.slug}`}
                   className="w-full flex items-center justify-center bg-acc text-acc-ink font-medium rounded-md border border-acc cursor-pointer"
                   style={{ padding: '5px 10px', fontSize: 12 }}
                 >
@@ -325,18 +297,19 @@ export default function ResultsPage({ params }: { params: Promise<{ slug: string
 
               <div className="flex gap-1.5 mt-3.5">
                 <Link
-                  href="/tasks"
+                  href={`/challenge/${slug}`}
                   className="flex-1 flex items-center justify-center rounded border border-line text-text-1 bg-transparent hover:bg-bg-2 cursor-pointer"
                   style={{ fontSize: 12, padding: '5px 10px' }}
                 >
                   ↻ 재도전
                 </Link>
-                <button
+                <Link
+                  href="/tasks"
                   className="flex-1 flex items-center justify-center rounded border border-line text-text-1 bg-transparent hover:bg-bg-2 cursor-pointer"
                   style={{ fontSize: 12, padding: '5px 10px' }}
                 >
-                  ↗ 공유
-                </button>
+                  목록 보기
+                </Link>
               </div>
             </div>
           </div>

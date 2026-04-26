@@ -7,16 +7,27 @@ export interface ChallengeTestCase {
   id: string;
   type: 'positive' | 'negative' | 'edge';
   input: string;
-  expected: string;
+  expected: string | string[];
+}
+
+export interface ChallengeBaseline {
+  totalTokens: number;
+  attempts: number;
+  timeSeconds: number;
 }
 
 export interface ChallengeDefinition {
+  slug: string;
   title: string;
+  category: string;
+  difficulty: 'easy' | 'medium' | 'hard';
   scenario: string;
   outputFormat: string;
   starterArtifact: string;
   requirements: ChallengeRequirement[];
   testCases: ChallengeTestCase[];
+  baseline: ChallengeBaseline;
+  maxAttempts: number;
 }
 
 export interface CodeBlock {
@@ -25,7 +36,10 @@ export interface CodeBlock {
 }
 
 export const HARD_CODED_CHALLENGE: ChallengeDefinition = {
+  slug: 'regex-email-001',
   title: '이메일 추출 정규식 작성',
+  category: 'regex',
+  difficulty: 'easy',
   scenario:
     '로그 텍스트에서 이메일 주소만 정확히 추출하는 JavaScript 정규식을 만들어야 합니다. AI와 대화하며 요구사항을 정리하고, 결과물 패널에 최종 산출물을 쌓아가세요.',
   outputFormat: `const EMAIL_REGEX = /YOUR_PATTERN/g;`,
@@ -43,22 +57,32 @@ console.log(sample.match(EMAIL_REGEX));`,
       id: 'tc-1',
       type: 'positive',
       input: '"Contact: alice@example.com or bob@sub.test.org"',
-      expected: '["alice@example.com", "bob@sub.test.org"]',
+      expected: ['alice@example.com', 'bob@sub.test.org'],
     },
     {
       id: 'tc-2',
       type: 'negative',
       input: '"Invalid: not-an-email, @missing.com"',
-      expected: '[]',
+      expected: [],
     },
     {
       id: 'tc-3',
       type: 'edge',
       input: '"Edge: a@b.c, very.long+tag@co.uk"',
-      expected: '["a@b.c", "very.long+tag@co.uk"]',
+      expected: ['a@b.c', 'very.long+tag@co.uk'],
     },
   ],
+  baseline: {
+    totalTokens: 800,
+    attempts: 2,
+    timeSeconds: 240,
+  },
+  maxAttempts: 5,
 };
+
+export function getChallengeDefinition(_slug?: string): ChallengeDefinition {
+  return HARD_CODED_CHALLENGE;
+}
 
 export function extractCodeBlocks(content: string): CodeBlock[] {
   const blocks: CodeBlock[] = [];

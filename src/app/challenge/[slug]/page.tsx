@@ -6,7 +6,8 @@ import Logo from '@/components/Logo';
 import { getClientAiConfig } from '@/lib/ai-provider.client';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import ProgressBar from '@/components/ProgressBar';
-import { extractCodeBlocks, stripCodeBlocks } from '@/lib/challenge';
+import { extractCodeBlocks, getChallengeDefinition, stripCodeBlocks } from '@/lib/challenge';
+import { savePendingEvaluation } from '@/lib/evaluation/storage';
 import { ALL_TASKS } from '@/lib/data';
 
 interface ChatMessage {
@@ -171,6 +172,7 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
   const { slug } = use(params);
   const router = useRouter();
   const t = ALL_TASKS.find((x) => x.slug === slug) || ALL_TASKS[0];
+  const challengeDef = getChallengeDefinition(t.slug);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage('assistant', '무엇을 도와드릴까요?'),
@@ -188,6 +190,7 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -210,7 +213,11 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
 
   const totalTokens = usage.inputTokens + usage.outputTokens;
   const elapsed = formatElapsed(sessionSeconds);
-  const attempts = '0/5';
+  const attemptCount = Math.max(
+    1,
+    artifactVersions.filter((version) => version.content.trim().length > 0).length,
+  );
+  const attempts = `${attemptCount}/${challengeDef.maxAttempts}`;
   const inputTokenRatio = totalTokens > 0 ? usage.inputTokens / totalTokens : 0;
   const outputTokenRatio = totalTokens > 0 ? usage.outputTokens / totalTokens : 0;
 
@@ -281,6 +288,29 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
     }
   }
 
+  function handleSubmitForEvaluation() {
+    setSubmitError(null);
+
+    if (!currentArtifact.trim()) {
+      setSubmitError('최종 제출 전 결과물 패널에 산출물을 하나 이상 추가해 주세요.');
+      return;
+    }
+
+    savePendingEvaluation({
+      slug: t.slug,
+      artifact: currentArtifact,
+      messages: messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+      usage,
+      elapsedSeconds: sessionSeconds,
+      attemptCount,
+    });
+
+    router.push(`/eval/${t.slug}`);
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg-0 text-text-1">
       <div
@@ -344,8 +374,7 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
             SCENARIO
           </div>
           <p className="text-text-2 mb-5.5" style={{ fontSize: 12, lineHeight: 1.55 }}>
-            로그 텍스트에서 이메일만 추출하는 정규식을 AI와 함께 만드세요. ReDoS 안전성도 고려해야
-            합니다.
+            {challengeDef.scenario}
           </p>
 
           <div
@@ -357,10 +386,10 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
           <div className="flex flex-col gap-1.5 mb-5.5">
             {(
               [
-                ['req-1', '유효한 이메일 형식 매칭', true],
-                ['req-2', '도메인 dot 최소 1개', true],
-                ['req-3', 'ReDoS 안전', null],
-                ['req-4', '결과물은 `const EMAIL_REGEX = /.../g;` 형식이어야 함', true],
+                ...challengeDef.requirements.map(
+                  (item) => [item.id, item.description, null] as const,
+                ),
+                ['format', `결과물 형식: ${challengeDef.outputFormat}`, null] as const,
               ] as const
             ).map(([id, desc, status]) => (
               <div key={id} className="flex gap-2 items-start" style={{ padding: '6px 0' }}>
@@ -409,8 +438,18 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
                   outputTokenRatio,
                   'var(--color-warn)',
                 ],
-                ['time', `${elapsed} / 04:00`, sessionSeconds / 240, 'var(--color-err)'],
-                ['attempts', '0 / 2', 0, 'var(--color-acc)'],
+                [
+                  'time',
+                  `${elapsed} / ${formatElapsed(challengeDef.baseline.timeSeconds)}`,
+                  sessionSeconds / challengeDef.baseline.timeSeconds,
+                  'var(--color-err)',
+                ],
+                [
+                  'attempts',
+                  `${attemptCount} / ${challengeDef.maxAttempts}`,
+                  attemptCount / challengeDef.maxAttempts,
+                  'var(--color-acc)',
+                ],
               ] as [string, string, number, string][]
             ).map(([label, value, ratio, color]) => (
               <div key={label}>
@@ -503,6 +542,20 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
                 }}
               >
                 {error}
+              </div>
+            ) : null}
+            {submitError ? (
+              <div
+                className="mb-2 rounded border"
+                style={{
+                  padding: '9px 10px',
+                  fontSize: 12,
+                  borderColor: 'rgba(255, 119, 77, 0.35)',
+                  color: 'var(--color-err)',
+                  background: 'rgba(255, 119, 77, 0.08)',
+                }}
+              >
+                {submitError}
               </div>
             ) : null}
             <div className="border border-line-2 rounded-md bg-bg-1" style={{ padding: 10 }}>
@@ -644,7 +697,7 @@ export default function ChallengePage({ params }: { params: Promise<{ slug: stri
               </button>
             </div>
             <button
-              onClick={() => router.push(`/eval/${t.slug}`)}
+              onClick={handleSubmitForEvaluation}
               className="w-full flex items-center justify-center bg-acc text-acc-ink font-semibold rounded-md border border-acc cursor-pointer transition-[filter] hover:brightness-105"
               style={{ padding: 10, fontSize: 13 }}
             >
