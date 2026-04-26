@@ -45,25 +45,21 @@ export default function LoginPage() {
 
   async function verify(e: FormEvent) {
     e.preventDefault();
-    if (code.length !== 6 || loading) return;
+    if (code.length !== 8 || loading) return;
     setLoading(true);
     setError(null);
 
-    // Supabase 의 OTP 토큰 type 은 발송 시점/사용자 상태에 따라 다름:
-    // - 신규 가입 (Confirm email ON) → 'signup'
-    // - 신규 가입 (Confirm email OFF) → 'email'
-    // - 기존 confirmed 사용자 재로그인 → 'recovery' (auth log: user_recovery_requested)
-    // - Magic Link 클릭 흐름 → 'magiclink'
-    // 클라이언트는 사용자 상태를 모르므로 4가지 type 을 순서대로 폴백.
-    const types = ['email', 'recovery', 'magiclink', 'signup'] as const;
-    let result: Awaited<ReturnType<typeof supabase.auth.verifyOtp>> | null = null;
-    for (const type of types) {
-      result = await supabase.auth.verifyOtp({ email, token: code, type });
-      if (!result.error) break;
-    }
+    // type: 'email' 은 GoTrue 서버에서 confirmation_token / recovery_token 양쪽을
+    // 모두 조회하는 catch-all 이므로 신규 가입과 기존 사용자 로그인을 한 번에 처리.
+    // (signup/magiclink/recovery 로 나눠 폴백 호출하면 /verify rate-limit 만 소모)
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email',
+    });
 
     setLoading(false);
-    if (!result || result.error) {
+    if (verifyError) {
       setError('잘못된 코드이거나 만료되었습니다.');
       return;
     }
@@ -124,7 +120,7 @@ export default function LoginPage() {
           <form onSubmit={verify} className="flex flex-col gap-3.5">
             <div className="text-text-2" style={{ fontSize: 12, lineHeight: 1.5 }}>
               <span className="font-mono text-text-3">{email}</span> 로<br />
-              6자리 인증 코드를 보냈습니다.
+              8자리 인증 코드를 보냈습니다.
             </div>
             <label
               className="font-mono text-text-3"
@@ -135,13 +131,13 @@ export default function LoginPage() {
             <input
               type="text"
               inputMode="numeric"
-              pattern="[0-9]{6}"
+              pattern="[0-9]{8}"
               autoFocus
               required
-              maxLength={6}
+              maxLength={8}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="000000"
+              placeholder="00000000"
               className="rounded-md bg-bg-2 border border-line font-mono outline-none focus:border-acc text-center"
               style={{ padding: '12px', fontSize: 18, letterSpacing: '0.4em' }}
               disabled={loading}
@@ -153,7 +149,7 @@ export default function LoginPage() {
             )}
             <button
               type="submit"
-              disabled={loading || code.length !== 6}
+              disabled={loading || code.length !== 8}
               className="rounded-md bg-acc font-medium disabled:opacity-50"
               style={{
                 padding: '10px 14px',
