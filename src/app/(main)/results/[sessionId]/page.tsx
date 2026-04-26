@@ -125,6 +125,8 @@ export default function ResultsPage({
   const status = evaluationData.status;
   const sess = session.session;
   const taskMeta = session.task.metadata;
+  const submittedArtifact =
+    session.artifacts.find((artifact) => artifact.is_final) ?? session.artifacts.at(-1) ?? null;
   const isEvaluating = status === 'evaluating' && !evaluation;
 
   return (
@@ -213,6 +215,41 @@ export default function ResultsPage({
             </div>
           </div>
 
+          {submittedArtifact && (
+            <div className="mb-7">
+              <div
+                className="font-mono text-text-3 mb-3.5"
+                style={{ fontSize: 11, letterSpacing: '0.08em' }}
+              >
+                ─── SUBMITTED ANSWER
+              </div>
+              <div className="bg-bg-1 border border-line rounded-[10px] overflow-hidden">
+                <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+                  <div className="font-mono text-text-3" style={{ fontSize: 11 }}>
+                    version {submittedArtifact.version}
+                    {submittedArtifact.is_final ? ' · final' : ''}
+                  </div>
+                  <div className="font-mono text-text-4" style={{ fontSize: 10 }}>
+                    {submittedArtifact.language ?? session.task.artifact_format.language}
+                  </div>
+                </div>
+                <pre
+                  className="custom-scroll overflow-x-auto text-text-2"
+                  style={{
+                    margin: 0,
+                    padding: '16px 18px',
+                    fontSize: 12.5,
+                    lineHeight: 1.65,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {submittedArtifact.content}
+                </pre>
+              </div>
+            </div>
+          )}
+
           {/* 채점 진행 또는 결과 */}
           {isEvaluating && (
             <div className="mb-7">
@@ -292,39 +329,55 @@ export default function ResultsPage({
                   >
                     ─── FEEDBACK
                   </div>
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div
-                      className="bg-bg-1 border rounded-[10px] p-4.5"
-                      style={{ borderColor: 'var(--color-acc-line)' }}
-                    >
+                  <div className="flex flex-col gap-3.5">
+                    {[
+                      {
+                        label: '잘한 점',
+                        tone: 'var(--color-acc)',
+                        border: 'var(--color-acc-line)',
+                        body: evaluation.feedback.good || '—',
+                      },
+                      {
+                        label: '개선할 점',
+                        tone: 'var(--color-warn)',
+                        border: 'var(--color-line)',
+                        body: evaluation.feedback.improve || '—',
+                      },
+                    ].map((item) => (
                       <div
-                        className="font-mono text-acc mb-2.5"
-                        style={{ fontSize: 10, letterSpacing: '0.06em' }}
+                        key={item.label}
+                        className="bg-bg-1 border rounded-[10px] overflow-hidden"
+                        style={{ borderColor: item.border }}
                       >
-                        ◆ 잘한 점
+                        <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+                          <div
+                            className="font-mono"
+                            style={{
+                              fontSize: 10,
+                              letterSpacing: '0.06em',
+                              color: item.tone,
+                            }}
+                          >
+                            ◆ {item.label}
+                          </div>
+                          <div className="font-mono text-text-4" style={{ fontSize: 10 }}>
+                            FEEDBACK
+                          </div>
+                        </div>
+                        <div
+                          className="custom-scroll overflow-y-auto text-text-2"
+                          style={{
+                            maxHeight: 180,
+                            padding: '14px 16px',
+                            fontSize: 13,
+                            lineHeight: 1.75,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {item.body}
+                        </div>
                       </div>
-                      <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-                        {evaluation.feedback.good || '—'}
-                      </p>
-                    </div>
-                    <div className="bg-bg-1 border border-line rounded-[10px] p-4.5">
-                      <div
-                        className="font-mono mb-2.5"
-                        style={{
-                          fontSize: 10,
-                          letterSpacing: '0.06em',
-                          color: 'var(--color-warn)',
-                        }}
-                      >
-                        ◆ 개선할 점
-                      </div>
-                      <p
-                        className="text-text-2"
-                        style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}
-                      >
-                        {evaluation.feedback.improve || '—'}
-                      </p>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
