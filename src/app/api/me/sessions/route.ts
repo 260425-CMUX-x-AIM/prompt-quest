@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const statusParam = url.searchParams.get('status') as SessionStatus | null;
   const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
   const limit = Math.min(
-    50,
+    100,
     Math.max(1, parseInt(url.searchParams.get('limit') ?? '20', 10) || 20),
   );
   const from = (page - 1) * limit;
@@ -30,10 +30,9 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('sessions')
-    .select(
-      '*, tasks(id, title, category_slug, difficulty), evaluations(total_score)',
-      { count: 'exact' },
-    )
+    .select('*, tasks(id, title, category_slug, difficulty), evaluations(total_score)', {
+      count: 'exact',
+    })
     .eq('user_id', user.id)
     .order('started_at', { ascending: false })
     .range(from, to);

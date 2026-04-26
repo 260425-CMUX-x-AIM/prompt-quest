@@ -1,168 +1,33 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { use, useEffect, useMemo, useState } from 'react';
 import NavBar from '@/components/NavBar';
 import Pagination from '@/components/Pagination';
 import Sparkline from '@/components/Sparkline';
 import { CategoryTag, DiffTag } from '@/components/Tags';
 import { getErrorMessage } from '@/lib/api/errors';
-import type { ApiError, MeSessionsItem, MeSessionsResponse } from '@/lib/api/contracts';
-import type { SessionStatus } from '@/lib/types/session';
+import type {
+  ApiError,
+  MeSessionsItem,
+  PublicProfile,
+  UserSessionsResponse,
+} from '@/lib/api/contracts';
+import {
+  ACTIVITY_COLORS,
+  buildActivitySummary,
+  buildBadges,
+  computeStreak,
+  formatShortDate,
+  scoreColor,
+} from '@/lib/profile-stats';
 
 const PAGE_SIZE = 10;
 const ACTIVITY_LIMIT = 100;
-const ACTIVITY_COLORS = [
-  'var(--color-bg-3)',
-  'oklch(0.86 0.2 130 / 0.3)',
-  'oklch(0.86 0.2 130 / 0.55)',
-  'var(--color-acc)',
-] as const;
 
-const STATUS_LABELS: Record<SessionStatus, string> = {
-  in_progress: '진행 중',
-  submitted: '제출됨',
-  evaluating: '채점 중',
-  evaluated: '완료',
-  failed: '실패',
-  abandoned: '포기',
-};
-
-const STATUS_FILTERS: Array<{ value: 'all' | SessionStatus; label: string }> = [
-  { value: 'all', label: '전체' },
-  { value: 'in_progress', label: '진행 중' },
-  { value: 'evaluated', label: '완료' },
-  { value: 'failed', label: '실패' },
-  { value: 'abandoned', label: '포기' },
-];
-
-type BadgeItem = {
-  code: string;
-  title: string;
-  achievedAt: string | null;
-};
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${m}/${day}`;
-}
-
-function scoreColor(score: number | null) {
-  if (score == null) return 'var(--color-text-4)';
-  if (score >= 80) return 'var(--color-acc)';
-  if (score >= 60) return 'var(--color-warn)';
-  return 'var(--color-err)';
-}
-
-function dateKeyFromDate(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function dateKeyFromIso(iso: string) {
-  return dateKeyFromDate(new Date(iso));
-}
-
-function subtractDays(base: Date, days: number) {
-  const next = new Date(base);
-  next.setDate(next.getDate() - days);
-  return next;
-}
-
-function computeStreak(sessions: MeSessionsItem[]) {
-  const activeDates = new Set(
-    sessions
-      .filter((session) => session.status !== 'abandoned')
-      .map((session) => dateKeyFromIso(session.started_at)),
-  );
-  if (activeDates.size === 0) return 0;
-
-  let cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  if (!activeDates.has(dateKeyFromDate(cursor))) {
-    cursor = subtractDays(cursor, 1);
-  }
-
-  let streak = 0;
-  while (activeDates.has(dateKeyFromDate(cursor))) {
-    streak += 1;
-    cursor = subtractDays(cursor, 1);
-  }
-
-  return streak;
-}
-
-function buildActivitySummary(sessions: MeSessionsItem[]) {
-  const counts = new Map<string, number>();
-  for (const session of sessions) {
-    if (session.status === 'abandoned') continue;
-    const key = dateKeyFromIso(session.started_at);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = subtractDays(today, 83);
-
-  const rawCells = Array.from({ length: 84 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    const key = dateKeyFromDate(date);
-    return {
-      key,
-      label: `${date.getMonth() + 1}/${date.getDate()}`,
-      count: counts.get(key) ?? 0,
-    };
-  });
-
-  const maxCount = rawCells.reduce((max, cell) => Math.max(max, cell.count), 0);
-  const cells = rawCells.map((cell) => {
-    if (cell.count === 0) return { ...cell, intensity: 0 as const };
-    if (maxCount <= 1) return { ...cell, intensity: 3 as const };
-    const ratio = cell.count / maxCount;
-    if (ratio < 0.34) return { ...cell, intensity: 1 as const };
-    if (ratio < 0.67) return { ...cell, intensity: 2 as const };
-    return { ...cell, intensity: 3 as const };
-  });
-
-  return {
-    cells,
-    activeDays: cells.filter((cell) => cell.count > 0).length,
-  };
-}
-
-function buildBadges(sessions: MeSessionsItem[], streak: number, activeDays: number): BadgeItem[] {
-  const ordered = [...sessions].sort(
-    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
-  );
-  const evaluated = ordered.filter((session) => session.status === 'evaluated');
-
-  const firstClear = evaluated[0];
-  const noRetryHero = evaluated.find(
-    (session) => session.attempt_count === 1 && (session.total_score ?? 0) >= 80,
-  );
-  const hardSolver = evaluated.find(
-    (session) => session.task.difficulty === 'hard' && (session.total_score ?? 0) >= 80,
-  );
-  const activeTenDays =
-    activeDays >= 10 ? ordered.find((session) => session.status !== 'abandoned') : null;
-
-  return [
-    { code: '01', title: 'First Clear', achievedAt: firstClear?.started_at ?? null },
-    { code: '02', title: 'No Retry Hero', achievedAt: noRetryHero?.started_at ?? null },
-    { code: '03', title: 'Streak 7d', achievedAt: streak >= 7 ? new Date().toISOString() : null },
-    { code: '04', title: 'Hard Solver', achievedAt: hardSolver?.started_at ?? null },
-    { code: '05', title: 'Active 10d', achievedAt: activeTenDays?.started_at ?? null },
-  ];
-}
-
-export default function MyPage() {
-  const [filter, setFilter] = useState<'all' | SessionStatus>('all');
+export default function PublicUserPage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = use(params);
   const [page, setPage] = useState(1);
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [sessions, setSessions] = useState<MeSessionsItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -172,30 +37,35 @@ export default function MyPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
 
-    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
-    if (filter !== 'all') params.set('status', filter);
+    const search = new URLSearchParams({
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      status: 'evaluated',
+    });
 
-    fetch(`/api/me/sessions?${params}`)
+    fetch(`/api/users/${username}/sessions?${search}`)
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) {
           const data = (await res.json().catch(() => null)) as ApiError | null;
           setError(getErrorMessage(data?.error?.code));
+          setProfile(null);
           setSessions([]);
           setTotal(0);
           return;
         }
 
-        const data = (await res.json()) as MeSessionsResponse;
+        const data = (await res.json()) as UserSessionsResponse;
         setError(null);
+        setProfile(data.profile);
         setSessions(data.sessions);
         setTotal(data.total);
       })
       .catch(() => {
         if (!cancelled) {
-          setError('세션 목록을 불러올 수 없습니다.');
+          setError('공개 프로필을 불러올 수 없습니다.');
+          setProfile(null);
           setSessions([]);
           setTotal(0);
         }
@@ -207,16 +77,22 @@ export default function MyPage() {
     return () => {
       cancelled = true;
     };
-  }, [filter, page]);
+  }, [page, username]);
 
   useEffect(() => {
     let cancelled = false;
-    setActivityLoading(true);
 
-    fetch(`/api/me/sessions?page=1&limit=${ACTIVITY_LIMIT}`)
+    fetch(`/api/users/${username}/sessions?page=1&limit=${ACTIVITY_LIMIT}`)
       .then(async (res) => {
-        if (cancelled || !res.ok) return;
-        const data = (await res.json()) as MeSessionsResponse;
+        if (cancelled) return;
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as ApiError | null;
+          setError(getErrorMessage(data?.error?.code));
+          setRecentSessions([]);
+          return;
+        }
+        const data = (await res.json()) as UserSessionsResponse;
+        setProfile(data.profile);
         setRecentSessions(data.sessions);
       })
       .catch(() => {
@@ -229,7 +105,7 @@ export default function MyPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [username]);
 
   const activitySummary = useMemo(() => buildActivitySummary(recentSessions), [recentSessions]);
   const streak = useMemo(() => computeStreak(recentSessions), [recentSessions]);
@@ -258,13 +134,22 @@ export default function MyPage() {
     .reverse()
     .map((session) => session.total_score ?? 0);
 
+  const title = profile?.display_name || `@${username}`;
+  const meta = profile?.display_name ? `@${profile.username}` : 'PUBLIC PROFILE';
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-0 text-text-1">
       <NavBar />
       <div className="custom-scroll flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1100px]" style={{ padding: '32px 36px 40px' }}>
+          <div
+            className="mb-2 font-mono text-text-3"
+            style={{ fontSize: 11, letterSpacing: '0.08em' }}
+          >
+            {meta}
+          </div>
           <h1 className="mb-7 font-medium" style={{ fontSize: 26 }}>
-            My
+            {title}
           </h1>
 
           <div className="mb-7 grid gap-2.5 md:grid-cols-3 xl:grid-cols-5">
@@ -328,39 +213,11 @@ export default function MyPage() {
 
           <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_280px]">
             <div>
-              <div className="mb-3.5 flex flex-wrap gap-2">
-                {STATUS_FILTERS.map((statusFilter) => (
-                  <button
-                    key={statusFilter.value}
-                    type="button"
-                    onClick={() => {
-                      setFilter(statusFilter.value);
-                      setPage(1);
-                    }}
-                    className="rounded font-mono"
-                    style={{
-                      padding: '5px 10px',
-                      fontSize: 11.5,
-                      letterSpacing: '0.04em',
-                      color:
-                        filter === statusFilter.value
-                          ? 'var(--color-text-1)'
-                          : 'var(--color-text-3)',
-                      background:
-                        filter === statusFilter.value ? 'var(--color-bg-2)' : 'transparent',
-                      border: '1px solid var(--color-line)',
-                    }}
-                  >
-                    {statusFilter.label}
-                  </button>
-                ))}
-              </div>
-
               <div
                 className="mb-3 font-mono text-text-3"
                 style={{ fontSize: 11, letterSpacing: '0.08em' }}
               >
-                HISTORY · {total} SESSIONS
+                COMPLETED HISTORY · {total} SESSIONS
               </div>
 
               {error && (
@@ -394,52 +251,41 @@ export default function MyPage() {
                   </div>
                 )}
 
-                {!loading && sessions.length === 0 && (
+                {!loading && sessions.length === 0 && !error && (
                   <div className="p-5 text-text-3" style={{ fontSize: 12 }}>
-                    아직 도전한 태스크가 없습니다.{' '}
-                    <Link href="/tasks" className="underline">
-                      태스크 목록 →
-                    </Link>
+                    아직 공개할 세션이 없습니다.
                   </div>
                 )}
 
-                {sessions.map((session, index) => {
-                  const target =
-                    session.status === 'in_progress'
-                      ? `/challenge/${session.id}`
-                      : `/results/${session.id}`;
-
-                  return (
-                    <Link
-                      key={session.id}
-                      href={target}
-                      className="grid items-center gap-3 border-b border-line hover:bg-bg-2"
-                      style={{
-                        gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
-                        padding: '12px 16px',
-                        borderBottom:
-                          index < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
-                        opacity: session.status === 'abandoned' ? 0.45 : 1,
-                      }}
+                {sessions.map((session, index) => (
+                  <div
+                    key={session.id}
+                    className="grid items-center gap-3 border-b border-line"
+                    style={{
+                      gridTemplateColumns: '60px 1fr 110px 80px 70px 80px',
+                      padding: '12px 16px',
+                      borderBottom:
+                        index < sessions.length - 1 ? '1px solid var(--color-line)' : 'none',
+                      opacity: session.status === 'abandoned' ? 0.45 : 1,
+                    }}
+                  >
+                    <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+                      {formatShortDate(session.started_at)}
+                    </span>
+                    <span style={{ fontSize: 13 }}>{session.task.title}</span>
+                    <CategoryTag cat={session.task.category} />
+                    <DiffTag level={session.task.difficulty} />
+                    <span
+                      className="font-mono font-medium"
+                      style={{ fontSize: 13, color: scoreColor(session.total_score) }}
                     >
-                      <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                        {formatDate(session.started_at)}
-                      </span>
-                      <span style={{ fontSize: 13 }}>{session.task.title}</span>
-                      <CategoryTag cat={session.task.category} />
-                      <DiffTag level={session.task.difficulty} />
-                      <span
-                        className="font-mono font-medium"
-                        style={{ fontSize: 13, color: scoreColor(session.total_score) }}
-                      >
-                        {session.total_score ?? '—'}
-                      </span>
-                      <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
-                        {STATUS_LABELS[session.status]}
-                      </span>
-                    </Link>
-                  );
-                })}
+                      {session.total_score ?? '—'}
+                    </span>
+                    <span className="font-mono text-text-3" style={{ fontSize: 11 }}>
+                      완료
+                    </span>
+                  </div>
+                ))}
               </div>
 
               {!loading && !error && total > 0 && (
@@ -546,7 +392,7 @@ export default function MyPage() {
                       <div className="min-w-0 flex-1">
                         <div style={{ fontSize: 12.5 }}>{badge.title}</div>
                         <div className="font-mono text-text-3" style={{ fontSize: 10 }}>
-                          {badge.achievedAt ? formatDate(badge.achievedAt) : 'locked'}
+                          {badge.achievedAt ? formatShortDate(badge.achievedAt) : 'locked'}
                         </div>
                       </div>
                     </div>
