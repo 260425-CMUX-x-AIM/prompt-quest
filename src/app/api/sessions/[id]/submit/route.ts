@@ -4,10 +4,7 @@ import type { SubmitRequest, SubmitResponse, ApiError } from '@/lib/api/contract
 
 // POST /api/sessions/[id]/submit — 결과물 제출 + B 의 evaluate-session Edge Function 트리거.
 // 사양: docs/06-api-endpoints.md §6.2
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: sessionId } = await params;
   const supabase = await createClient();
 
@@ -87,7 +84,8 @@ export async function POST(
 
   // Edge Function 트리거. 실패 시 status 롤백 (검토 #6).
   try {
-    const supabaseUrl = process.env.SUPABASE_URL;
+    // SUPABASE_URL 이 없으면 NEXT_PUBLIC_SUPABASE_URL 로 폴백 (둘 다 같은 값).
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error('SUPABASE_URL 또는 SUPABASE_SERVICE_ROLE_KEY 미설정');

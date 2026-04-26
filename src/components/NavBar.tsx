@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
@@ -8,19 +9,26 @@ import { createClient } from '@/lib/supabase/client';
 const NAV_ITEMS = [
   { id: 'tasks', label: 'Tasks', href: '/tasks' },
   { id: 'leaderboard', label: 'Leaderboard', href: '#', soon: true },
-  { id: 'me', label: 'My Dojo', href: '/me' },
+  { id: 'me', label: 'My', href: '/me' },
 ];
 
-export default function NavBar({
-  user = 'kim.dev',
-  streak = 4,
-}: {
-  user?: string;
-  streak?: number;
-}) {
+export default function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const [user, setUser] = useState<string>('—');
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled || !data.user) return;
+      const email = data.user.email ?? '';
+      setUser(email.split('@')[0] || 'user');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   const getActive = () => {
     if (pathname.startsWith('/tasks') || pathname.startsWith('/challenge')) return 'tasks';
@@ -71,12 +79,9 @@ export default function NavBar({
       </div>
       <div className="flex items-center gap-3.5">
         <div
-          className="font-mono flex items-center gap-1.5"
-          style={{ fontSize: 11, color: 'var(--color-text-3)' }}
+          className="flex items-center gap-2"
+          style={{ fontSize: 12, color: 'var(--color-text-2)' }}
         >
-          <span className="text-acc">▲</span> streak {streak}d
-        </div>
-        <div className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--color-text-2)' }}>
           <div
             className="grid place-items-center rounded"
             style={{
