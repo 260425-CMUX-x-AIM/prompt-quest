@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
+import { createClient } from '@/lib/supabase/client';
 
 const NAV_ITEMS = [
   { id: 'tasks', label: 'Tasks', href: '/tasks' },
@@ -10,16 +11,30 @@ const NAV_ITEMS = [
   { id: 'me', label: 'My Dojo', href: '/my-dojo' },
 ];
 
-export default function NavBar({ user = 'kim.dev', streak = 4 }: { user?: string; streak?: number }) {
+export default function NavBar({
+  user = 'kim.dev',
+  streak = 4,
+}: {
+  user?: string;
+  streak?: number;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
 
   const getActive = () => {
     if (pathname.startsWith('/tasks') || pathname.startsWith('/challenge')) return 'tasks';
-    if (pathname.startsWith('/my-dojo')) return 'me';
+    if (pathname.startsWith('/my-dojo') || pathname.startsWith('/me')) return 'me';
     return '';
   };
 
   const active = getActive();
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.replace('/login');
+    router.refresh();
+  }
 
   return (
     <div
@@ -77,6 +92,14 @@ export default function NavBar({ user = 'kim.dev', streak = 4 }: { user?: string
           </div>
           <span className="font-mono">{user}</span>
         </div>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="font-mono text-text-3 hover:text-text-2"
+          style={{ fontSize: 11, letterSpacing: '0.04em' }}
+        >
+          logout
+        </button>
       </div>
     </div>
   );
