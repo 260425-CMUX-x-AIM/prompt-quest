@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
@@ -12,21 +12,44 @@ const NAV_ITEMS = [
   { id: 'me', label: 'My', href: '/me' },
 ];
 
+type AuthState = 'loading' | 'authed' | 'unauthed';
+
 export default function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
-  const [user, setUser] = useState<string>('—');
+  // 매 렌더마다 supabase 클라이언트 재생성 방지
+  const supabase = useMemo(() => createClient(), []);
+  const [authState, setAuthState] = useState<AuthState>('loading');
+  const [username, setUsername] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
+
+    function applyUser(user: { email?: string | null } | null | undefined) {
+      if (!user) {
+        setAuthState('unauthed');
+        setUsername('');
+        return;
+      }
+      const email = user.email ?? '';
+      setUsername(email.split('@')[0] || 'user');
+      setAuthState('authed');
+    }
+
     supabase.auth.getUser().then(({ data }) => {
-      if (cancelled || !data.user) return;
-      const email = data.user.email ?? '';
-      setUser(email.split('@')[0] || 'user');
+      if (cancelled) return;
+      applyUser(data.user);
     });
+
+    // 로그아웃·로그인 즉시 반영
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      applyUser(session?.user ?? null);
+    });
+
     return () => {
       cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, [supabase]);
 
@@ -78,33 +101,48 @@ export default function NavBar() {
         </div>
       </div>
       <div className="flex items-center gap-3.5">
-        <div
-          className="flex items-center gap-2"
-          style={{ fontSize: 12, color: 'var(--color-text-2)' }}
-        >
-          <div
-            className="grid place-items-center rounded"
-            style={{
-              width: 22,
-              height: 22,
-              background: 'linear-gradient(135deg, var(--color-acc), oklch(0.7 0.15 130))',
-              color: 'var(--color-acc-ink)',
-              fontSize: 11,
-              fontWeight: 700,
-            }}
+        {authState === 'authed' && (
+          <>
+            <div
+              className="flex items-center gap-2"
+              style={{ fontSize: 12, color: 'var(--color-text-2)' }}
+            >
+              <div
+                className="grid place-items-center rounded"
+                style={{
+                  width: 22,
+                  height: 22,
+                  background: 'linear-gradient(135deg, var(--color-acc), oklch(0.7 0.15 130))',
+                  color: 'var(--color-acc-ink)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {(username[0] ?? '').toUpperCase()}
+              </div>
+              <span className="font-mono">{username}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="font-mono text-text-3 hover:text-text-2"
+              style={{ fontSize: 11, letterSpacing: '0.04em' }}
+            >
+              logout
+            </button>
+          </>
+        )}
+        {authState === 'unauthed' && (
+          <Link
+            href="/login"
+            className="font-mono rounded bg-acc text-acc-ink"
+            style={{ padding: '5px 12px', fontSize: 12 }}
           >
-            K
-          </div>
-          <span className="font-mono">{user}</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="font-mono text-text-3 hover:text-text-2"
-          style={{ fontSize: 11, letterSpacing: '0.04em' }}
-        >
-          logout
-        </button>
+            로그인
+          </Link>
+        )}
+        {/* loading 상태에서는 우측 영역 비워둠 — flash 방지 */}
       </div>
     </div>
   );
