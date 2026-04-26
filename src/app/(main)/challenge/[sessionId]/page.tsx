@@ -107,14 +107,50 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-export default function ChallengePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+// Day 4 에서 sessionId 로 실제 세션을 페치하도록 재작성 예정.
+// Day 3 단계는 라우트 정렬만 — 내부 mock 사용은 그대로.
+export default function ChallengePage({
+  params,
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
+  const { sessionId: slug } = use(params);
   const router = useRouter();
   const t = ALL_TASKS.find((x) => x.slug === slug) || ALL_TASKS[0];
   const [input, setInput] = useState('');
   const [activeArtifact, setActiveArtifact] = useState('v2');
   const chatRef = useRef<HTMLDivElement>(null);
   const messages = SAMPLE_MESSAGES;
+
+  // 세션 entry 가드 — sessionId 로 페치, 권한·상태 검증 후 부적합하면 redirect
+  // (Day 5 에서 데이터를 실제 UI에 바인딩하도록 확장 예정)
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/sessions/${slug}`)
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 401) {
+          router.replace('/login');
+          return;
+        }
+        if (!res.ok) {
+          router.replace('/tasks');
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        // 제출된 세션 재진입 → 결과 페이지로 (검토 #4)
+        if (data.session?.status && data.session.status !== 'in_progress') {
+          router.replace(`/results/${slug}`);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) router.replace('/tasks');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, router]);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
