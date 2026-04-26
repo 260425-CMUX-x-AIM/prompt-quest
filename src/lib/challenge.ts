@@ -1,3 +1,5 @@
+import type { TaskDefinition } from '@/lib/types/task';
+
 export interface ChallengeRequirement {
   id: string;
   description: string;
@@ -57,8 +59,10 @@ export interface ChallengeDefinition {
 }
 
 export interface CodeBlock {
+  id: string;
   language: string;
   content: string;
+  line_count: number;
 }
 
 export const SCORING_RUBRIC = [
@@ -3856,15 +3860,36 @@ export function extractCodeBlocks(content: string): CodeBlock[] {
   const regex = /```([\w-]+)?\n([\s\S]*?)```/g;
 
   let match = regex.exec(content);
+  let index = 0;
   while (match) {
+    const blockContent = match[2].trim();
     blocks.push({
+      id: `blk-${Date.now()}-${index++}`,
       language: match[1]?.trim() || 'text',
-      content: match[2].trim(),
+      content: blockContent,
+      line_count: blockContent.split('\n').length,
     });
     match = regex.exec(content);
   }
 
   return blocks;
+}
+
+export function buildSystemPrompt(taskDef: TaskDefinition): string {
+  const requirements = taskDef.requirements.map((requirement) => `- ${requirement.description}`).join('\n');
+
+  return `당신은 개발자가 풀고 있는 다음 태스크를 돕는 AI 어시스턴트입니다.
+
+[태스크]
+${taskDef.metadata.title}
+
+[배경]
+${taskDef.context.background}
+
+[요구사항]
+${requirements}
+
+사용자의 질문에 답하고 코드를 작성하세요. 코드는 \`\`\`언어 블록으로 감싸 주세요.`;
 }
 
 export function stripCodeBlocks(content: string): string {

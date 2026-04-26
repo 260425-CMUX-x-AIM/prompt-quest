@@ -1,4 +1,13 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { runEvaluationPipeline } from './pipeline.ts';
+
+declare const Deno: {
+  serve(handler: (request: Request) => Response | Promise<Response>): void;
+};
+
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void;
+};
 
 Deno.serve(async (request) => {
   const { sessionId } = await request.json();

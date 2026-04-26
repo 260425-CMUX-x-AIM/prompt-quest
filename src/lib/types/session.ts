@@ -1,3 +1,6 @@
+// 세션 / 메시지 / 결과물 도메인 타입.
+// 사양: docs/03-team-split.md §3.4, docs/05-database-schema.md (sessions, messages, artifacts).
+
 export type SessionStatus =
   | 'in_progress'
   | 'submitted'
@@ -38,13 +41,17 @@ export interface Message {
   created_at: string;
 }
 
+// DB는 3-value를 유지 (`'manual'`은 v1.5의 빈 artifact 직접 작성 진입점 보존).
+// MVP UI는 `'ai_extracted' | 'user_edited'`만 사용하지만, 도메인 타입은 3-value 그대로.
+export type ArtifactSource = 'ai_extracted' | 'user_edited' | 'manual';
+
 export interface Artifact {
   id: string;
   session_id: string;
   version: number;
   content: string;
   language: string | null;
-  source: 'ai_extracted' | 'user_edited' | 'manual';
+  source: ArtifactSource;
   is_final: boolean;
   created_at: string;
 }

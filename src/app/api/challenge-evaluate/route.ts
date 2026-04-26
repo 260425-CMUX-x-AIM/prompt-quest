@@ -27,10 +27,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '채점 요청 형식이 올바르지 않습니다.' }, { status: 400 });
   }
 
+  const normalizedBody = body as EvaluationInput & {
+    usage: EvaluationInput['usage'] & { inputTokens?: number; outputTokens?: number };
+    elapsedSeconds?: number;
+    attemptCount?: number;
+  };
+
   const input: EvaluationInput = {
-    slug: body.slug,
-    artifact: body.artifact.trim(),
-    messages: body.messages
+    slug: normalizedBody.slug,
+    artifact: normalizedBody.artifact.trim(),
+    messages: normalizedBody.messages
       .filter(
         (message): message is EvaluationInput['messages'][number] =>
           !!message &&
@@ -43,11 +49,11 @@ export async function POST(request: Request) {
         content: message.content.trim(),
       })),
     usage: {
-      input_tokens: body.usage.input_tokens ?? body.usage.inputTokens ?? 0,
-      output_tokens: body.usage.output_tokens ?? body.usage.outputTokens ?? 0,
+      input_tokens: normalizedBody.usage.input_tokens ?? normalizedBody.usage.inputTokens ?? 0,
+      output_tokens: normalizedBody.usage.output_tokens ?? normalizedBody.usage.outputTokens ?? 0,
     },
-    elapsed_seconds: body.elapsed_seconds ?? body.elapsedSeconds ?? 0,
-    attempt_count: body.attempt_count ?? body.attemptCount ?? 1,
+    elapsed_seconds: normalizedBody.elapsed_seconds ?? normalizedBody.elapsedSeconds ?? 0,
+    attempt_count: normalizedBody.attempt_count ?? normalizedBody.attemptCount ?? 1,
   };
 
   if (!input.artifact) {

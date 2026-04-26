@@ -1,10 +1,10 @@
+// 4단계 채점 결과 + 진행 단계 도메인 타입.
+// 사양: docs/03-team-split.md §3.4, docs/02-evaluation-logic.md, docs/05-database-schema.md (evaluations, evaluation_stages).
+
 export interface ValidatorResult {
   passed: boolean;
   passed_requirements: string[];
-  failed_requirements: Array<{
-    id: string;
-    reason: string;
-  }>;
+  failed_requirements: { id: string; reason: string }[];
   overall_reason: string;
 }
 
@@ -34,11 +34,7 @@ export interface JudgeRunResult {
 
 export interface JudgeResult extends JudgeRunResult {
   raw_runs: JudgeRunResult[];
-  inter_run_stddev: {
-    clarity: number;
-    context: number;
-    recovery: number;
-  };
+  inter_run_stddev: { clarity: number; context: number; recovery: number };
   successful_runs: number;
 }
 
@@ -52,10 +48,7 @@ export interface AggregatedResult {
     clarity: number;
     pattern_bonus: number;
   };
-  feedback: {
-    good: string;
-    improve: string;
-  };
+  feedback: { good: string; improve: string };
   percentile: number;
   meta: {
     baseline_source: 'observed' | 'estimated' | 'default';
@@ -63,4 +56,15 @@ export interface AggregatedResult {
     judge_max_stddev: number;
     is_low_confidence: boolean;
   };
+}
+
+export type EvaluationStageName = 'validator' | 'quantitative' | 'judge' | 'aggregator';
+
+export type EvaluationStageStatus = 'pending' | 'running' | 'success' | 'failed';
+
+export interface EvaluationStage {
+  stage: EvaluationStageName;
+  status: EvaluationStageStatus;
+  duration_ms: number | null;
+  error_message: string | null;
 }

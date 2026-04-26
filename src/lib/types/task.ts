@@ -1,3 +1,6 @@
+// 태스크 정의 (YAML로부터 파싱) 도메인 타입.
+// 사양: docs/03-team-split.md §3.4, docs/08-task-system.md.
+
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface Requirement {
