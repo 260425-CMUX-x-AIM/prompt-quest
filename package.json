@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "seed:tasks": "tsx scripts/seed-tasks.ts",
+    "smoke:evaluation": "tsx scripts/smoke-evaluation.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
@@ -32,6 +34,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "prettier": "^3.8.3",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.5"
   }

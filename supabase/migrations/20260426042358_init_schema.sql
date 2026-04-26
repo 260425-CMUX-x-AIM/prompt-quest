@@ -20,6 +20,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   base_username text;
@@ -29,12 +30,12 @@ begin
   base_username := split_part(new.email, '@', 1);
   final_username := base_username;
 
-  while exists (select 1 from profiles where username = final_username) loop
+  while exists (select 1 from public.profiles where username = final_username) loop
     counter := counter + 1;
     final_username := base_username || '-' || counter::text;
   end loop;
 
-  insert into profiles (id, username, terms_accepted_at, privacy_accepted_at)
+  insert into public.profiles (id, username, terms_accepted_at, privacy_accepted_at)
   values (new.id, final_username, now(), now());
 
   return new;
@@ -71,6 +72,7 @@ values
 on conflict (slug) do nothing;
 
 alter table task_categories enable row level security;
+
 create policy "카테고리 누구나 읽기" on task_categories for select using (true);
 
 create table if not exists tasks (
@@ -80,15 +82,17 @@ create table if not exists tasks (
   category_slug text not null references task_categories(slug),
   difficulty text not null check (difficulty in ('easy', 'medium', 'hard')),
   yaml_definition text not null,
+  estimated_minutes int default 5,
   is_published boolean default false,
   published_at timestamptz,
   created_at timestamptz default now()
 );
 
-create index if not exists idx_tasks_published on tasks(is_published, difficulty);
-create index if not exists idx_tasks_category on tasks(category_slug);
+create index idx_tasks_published on tasks(is_published, difficulty);
+create index idx_tasks_category on tasks(category_slug);
 
 alter table tasks enable row level security;
+
 create policy "공개 태스크 읽기" on tasks for select using (is_published = true);
 
 create table if not exists sessions (
@@ -107,10 +111,11 @@ create table if not exists sessions (
   created_at timestamptz default now()
 );
 
-create index if not exists idx_sessions_user_status on sessions(user_id, status);
-create index if not exists idx_sessions_task on sessions(task_id);
+create index idx_sessions_user_status on sessions(user_id, status);
+create index idx_sessions_task on sessions(task_id);
 
 alter table sessions enable row level security;
+
 create policy "본인 세션 조회" on sessions for select using (auth.uid() = user_id);
 create policy "본인 세션 생성" on sessions for insert with check (auth.uid() = user_id);
 create policy "본인 세션 수정" on sessions for update using (auth.uid() = user_id);
@@ -126,11 +131,26 @@ create table if not exists messages (
   created_at timestamptz default now()
 );
 
-create index if not exists idx_messages_session on messages(session_id, created_at);
+create index idx_messages_session on messages(session_id, created_at);
 
 alter table messages enable row level security;
+
 create policy "본인 메시지 조회" on messages for select using (
-  exists (select 1 from sessions where sessions.id = messages.session_id and sessions.user_id = auth.uid())
+  exists (
+    select 1
+    from sessions
+    where sessions.id = messages.session_id
+      and sessions.user_id = auth.uid()
+  )
+);
+
+create policy "본인 메시지 생성" on messages for insert with check (
+  exists (
+    select 1
+    from sessions
+    where sessions.id = messages.session_id
+      and sessions.user_id = auth.uid()
+  )
 );
 
 create table if not exists artifacts (
@@ -144,14 +164,26 @@ create table if not exists artifacts (
   created_at timestamptz default now()
 );
 
-create unique index if not exists idx_artifacts_final on artifacts(session_id) where is_final = true;
+create unique index idx_artifacts_final on artifacts(session_id) where is_final = true;
 
 alter table artifacts enable row level security;
+
 create policy "본인 아티팩트 조회" on artifacts for select using (
-  exists (select 1 from sessions where sessions.id = artifacts.session_id and sessions.user_id = auth.uid())
+  exists (
+    select 1
+    from sessions
+    where sessions.id = artifacts.session_id
+      and sessions.user_id = auth.uid()
+  )
 );
+
 create policy "본인 아티팩트 수정" on artifacts for all using (
-  exists (select 1 from sessions where sessions.id = artifacts.session_id and sessions.user_id = auth.uid())
+  exists (
+    select 1
+    from sessions
+    where sessions.id = artifacts.session_id
+      and sessions.user_id = auth.uid()
+  )
 );
 
 create table if not exists evaluations (
@@ -168,13 +200,20 @@ create table if not exists evaluations (
 );
 
 alter table evaluations enable row level security;
+
 create policy "본인 평가 조회" on evaluations for select using (
-  exists (select 1 from sessions where sessions.id = evaluations.session_id and sessions.user_id = auth.uid())
+  exists (
+    select 1
+    from sessions
+    where sessions.id = evaluations.session_id
+      and sessions.user_id = auth.uid()
+  )
 );
 
 create table if not exists evaluation_stages (
   id uuid primary key default gen_random_uuid(),
   evaluation_id uuid not null references evaluations(id) on delete cascade,
+  session_id uuid references sessions(id) on delete cascade,
   stage text not null check (stage in ('validator', 'quantitative', 'judge', 'aggregator')),
   status text not null check (status in ('pending', 'running', 'success', 'failed')),
   input_data jsonb,
@@ -186,14 +225,15 @@ create table if not exists evaluation_stages (
   created_at timestamptz default now()
 );
 
-create index if not exists idx_eval_stages_eval on evaluation_stages(evaluation_id, stage);
+create index idx_eval_stages_eval on evaluation_stages(evaluation_id, stage);
 
 alter table evaluation_stages enable row level security;
+
 create policy "본인 단계 조회" on evaluation_stages for select using (
   exists (
-    select 1 from evaluations
-    join sessions on sessions.id = evaluations.session_id
-    where evaluations.id = evaluation_stages.evaluation_id
+    select 1
+    from sessions
+    where sessions.id = evaluation_stages.session_id
       and sessions.user_id = auth.uid()
   )
 );
@@ -212,62 +252,9 @@ create table if not exists evaluation_disputes (
   reviewed_at timestamptz
 );
 
-create index if not exists idx_disputes_status on evaluation_disputes(status, created_at);
+create index idx_disputes_status on evaluation_disputes(status, created_at);
 
 alter table evaluation_disputes enable row level security;
+
 create policy "본인 분쟁 생성" on evaluation_disputes for insert with check (auth.uid() = user_id);
 create policy "본인 분쟁 조회" on evaluation_disputes for select using (auth.uid() = user_id);
-
-create table if not exists task_baselines (
-  task_id uuid primary key references tasks(id) on delete cascade,
-  median_total_tokens int,
-  median_attempts int,
-  median_time_seconds int,
-  sample_size int default 0,
-  last_updated_at timestamptz default now()
-);
-
-create table if not exists task_health_metrics (
-  task_id uuid primary key references tasks(id) on delete cascade,
-  total_attempts int default 0,
-  completion_rate numeric(4, 3),
-  abandonment_rate numeric(4, 3),
-  avg_score numeric(5, 2),
-  score_stddev numeric(5, 2),
-  is_problematic boolean default false,
-  problem_reason text,
-  last_computed_at timestamptz default now()
-);
-
-create or replace function increment_session_counters(
-  p_session_id uuid,
-  p_input_tokens int,
-  p_output_tokens int
-) returns void
-language plpgsql
-as $$
-begin
-  update sessions
-  set total_input_tokens = total_input_tokens + coalesce(p_input_tokens, 0),
-      total_output_tokens = total_output_tokens + coalesce(p_output_tokens, 0),
-      message_count = message_count + 2
-  where id = p_session_id;
-end;
-$$;
-
-create or replace function submit_artifact(
-  p_session_id uuid,
-  p_artifact_id uuid
-) returns void
-language plpgsql
-as $$
-begin
-  update artifacts set is_final = false where session_id = p_session_id;
-  update artifacts set is_final = true where id = p_artifact_id;
-  update sessions
-  set status = 'evaluating',
-      submitted_at = now(),
-      attempt_count = attempt_count + 1
-  where id = p_session_id;
-end;
-$$;

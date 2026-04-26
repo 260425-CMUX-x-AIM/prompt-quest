@@ -1,12 +1,10 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { parse as parseYaml } from 'jsr:@std/yaml';
-import type {
-  AggregatedResult,
-  JudgeResult,
-  QuantitativeResult,
-  TaskDefinition,
-  ValidatorResult,
-} from './types.ts';
+import type { TaskDefinition } from './types.ts';
+import { validateArtifact } from './validator.ts';
+import { analyzeQuantitative } from './quantitative.ts';
+import { judgeWithEnsemble } from './judge.ts';
+import { aggregate } from './aggregator.ts';
 
 const STAGE_TIMEOUT_MS = {
   validator: 15_000,
@@ -69,6 +67,7 @@ export async function runEvaluationPipeline(sessionId: string): Promise<void> {
       evaluation.id,
       'validator',
       {
+        session_id: sessionId,
         requirements: taskDefinition.requirements,
         artifact,
         test_cases: taskDefinition.test_cases,
@@ -117,7 +116,7 @@ export async function runEvaluationPipeline(sessionId: string): Promise<void> {
       supabase,
       evaluation.id,
       'quantitative',
-      { baseline },
+      { session_id: sessionId, baseline },
       STAGE_TIMEOUT_MS.quantitative,
       () => analyzeQuantitative(session, session.messages ?? [], baseline),
     );
@@ -126,7 +125,7 @@ export async function runEvaluationPipeline(sessionId: string): Promise<void> {
       supabase,
       evaluation.id,
       'judge',
-      { message_count: session.messages?.length ?? 0 },
+      { session_id: sessionId, message_count: session.messages?.length ?? 0 },
       STAGE_TIMEOUT_MS.judge,
       () => judgeWithEnsemble(taskDefinition, session.messages ?? [], artifact),
     );
@@ -136,7 +135,7 @@ export async function runEvaluationPipeline(sessionId: string): Promise<void> {
       supabase,
       evaluation.id,
       'aggregator',
-      { score_distribution_size: scoreDistribution.length },
+      { session_id: sessionId, score_distribution_size: scoreDistribution.length },
       STAGE_TIMEOUT_MS.aggregator,
       () =>
         aggregate({
@@ -179,6 +178,12 @@ async function runStage<T>(
     .from('evaluation_stages')
     .insert({
       evaluation_id: evaluationId,
+      session_id:
+        inputData &&
+        typeof inputData === 'object' &&
+        'session_id' in (inputData as Record<string, unknown>)
+          ? ((inputData as Record<string, unknown>).session_id as string | null)
+          : null,
       stage,
       status: 'running',
       input_data: inputData as object,
@@ -305,42 +310,4 @@ async function markFailed(
     .eq('id', sessionId);
 
   console.error(`evaluate-session failed (${sessionId}): ${reason}`);
-}
-
-async function validateArtifact(
-  _taskDefinition: TaskDefinition,
-  _artifact: string,
-): Promise<ValidatorResult> {
-  throw new Error('TODO: validateArtifact 구현을 Edge Function에 연결하세요.');
-}
-
-async function analyzeQuantitative(
-  _session: Record<string, unknown>,
-  _messages: Array<Record<string, unknown>>,
-  _baseline: {
-    median_total_tokens: number;
-    median_attempts: number;
-    median_time_seconds: number;
-    source: 'observed' | 'estimated' | 'default';
-  },
-): Promise<QuantitativeResult> {
-  throw new Error('TODO: analyzeQuantitative 구현을 Edge Function에 연결하세요.');
-}
-
-async function judgeWithEnsemble(
-  _taskDefinition: TaskDefinition,
-  _messages: Array<Record<string, unknown>>,
-  _artifact: string,
-): Promise<JudgeResult> {
-  throw new Error('TODO: judgeWithEnsemble 구현을 Edge Function에 연결하세요.');
-}
-
-async function aggregate(_input: {
-  validator: ValidatorResult;
-  quantitative: QuantitativeResult;
-  judge: JudgeResult;
-  task: { difficulty: 'easy' | 'medium' | 'hard' };
-  scoreDistribution: number[];
-}): Promise<AggregatedResult> {
-  throw new Error('TODO: aggregate 구현을 Edge Function에 연결하세요.');
 }

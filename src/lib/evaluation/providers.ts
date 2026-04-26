@@ -36,8 +36,8 @@ export function getEvaluationProviderConfig(): EvaluationProviderConfig {
 
   return {
     provider,
-    validatorModel: process.env.VALIDATOR_MODEL || 'gpt-4.1-mini',
-    judgeModel: process.env.JUDGE_MODEL || 'gpt-4.1-mini',
+    validatorModel: process.env.VALIDATOR_MODEL || 'gpt-4o-mini',
+    judgeModel: process.env.JUDGE_MODEL || 'gpt-4o-mini',
     apiKey: process.env.OPENAI_API_KEY,
   };
 }
